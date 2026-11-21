@@ -46,8 +46,8 @@ function Detail({ r }: { r: Report }) {
 
       <section className={`verdict ${r.verdict === "BET_CANDIDATE" ? "candidate" : "nobet"}`}>
         <div>
-          <strong>{r.verdict === "BET_CANDIDATE" ? "CANDIDATE" : "NO BET"}</strong>
-          <span> · confidence {r.confidence}</span>
+          <div className="big">{r.verdict === "BET_CANDIDATE" ? "Candidate" : "No bet"}</div>
+          <div className="conf">Confidence {r.confidence}</div>
         </div>
         <p>
           {r.verdict === "BET_CANDIDATE"

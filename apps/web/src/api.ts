@@ -51,6 +51,9 @@ export interface Game {
   confidence: "LOW" | "MEDIUM" | "HIGH" | null;
   oddsFetchedAt: string | null;
   bestEv: number | null;
+  pHome: number | null;
+  pDraw: number | null;
+  pAway: number | null;
 }
 
 export interface LeagueRow {

@@ -19,8 +19,9 @@ function TokenScreen({ onSaved, message }: { onSaved: () => void; message?: stri
   const [value, setValue] = useState("");
   return (
     <main className="page narrow">
-      <h1>Data Is Truth</h1>
-      <p className="muted">Personal sports analysis. Enter your access token to continue. It stays in this browser only.</p>
+      <span className="mark" aria-hidden>DT</span>
+      <h1>Data Is <span style={{ color: "var(--accent)" }}>Truth</span></h1>
+      <p className="lead">Personal sports analysis. Enter your access token to continue. It stays in this browser only.</p>
       {message && <p className="error">{message}</p>}
       <form
         onSubmit={(e) => {
@@ -57,7 +58,10 @@ export function App() {
   return (
     <>
       <header className="topbar">
-        <a href="#/" className="brand">Data Is Truth</a>
+        <a href="#/" className="brand">
+          <span className="mark" aria-hidden>DT</span>
+          <span>Data Is <b>Truth</b></span>
+        </a>
         <nav>
           <a href="#/" aria-current={route === "#/" || route === "" ? "page" : undefined}>Games</a>
           <a href="#/leagues" aria-current={route === "#/leagues" ? "page" : undefined}>Leagues</a>

@@ -68,6 +68,9 @@ app.get("/api/games", async (c) => {
             json_extract(r.report_json, '$.verdict') AS verdict,
             json_extract(r.report_json, '$.confidence') AS confidence,
             json_extract(r.report_json, '$.dataFreshness.odds') AS oddsFetchedAt,
+            json_extract(r.report_json, '$.model.probabilities."1x2".home') AS pHome,
+            json_extract(r.report_json, '$.model.probabilities."1x2".draw') AS pDraw,
+            json_extract(r.report_json, '$.model.probabilities."1x2".away') AS pAway,
             (SELECT MAX(json_extract(v.value, '$.ev')) FROM json_each(r.report_json, '$.shortlist') v) AS bestEv
      FROM matches m
      JOIN leagues l ON l.id = m.league_id

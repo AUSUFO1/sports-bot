@@ -20,18 +20,19 @@ export function Games({ onUnauthorized }: { onUnauthorized: () => void }) {
   useEffect(load, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const leagues = useMemo(() => [...new Set((games ?? []).map((g) => g.leagueName))].sort(), [games]);
+  const visible = useMemo(() => (games ?? []).filter((g) => !league || g.leagueName === league), [games, league]);
   const grouped = useMemo(() => {
-    const byDay = new Map<string, { label: string; byLeague: Map<string, Game[]> }>();
-    for (const g of games ?? []) {
-      if (league && g.leagueName !== league) continue;
+    const byDay = new Map<string, { label: string; list: Game[] }>();
+    for (const g of visible) {
       const k = dayKey(g.kickoffUtc);
-      if (!byDay.has(k)) byDay.set(k, { label: dayLabel(g.kickoffUtc), byLeague: new Map() });
-      const d = byDay.get(k)!;
-      if (!d.byLeague.has(g.leagueName)) d.byLeague.set(g.leagueName, []);
-      d.byLeague.get(g.leagueName)!.push(g);
+      if (!byDay.has(k)) byDay.set(k, { label: dayLabel(g.kickoffUtc), list: [] });
+      byDay.get(k)!.list.push(g);
     }
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [games, league]);
+  }, [visible]);
+
+  const withReport = visible.filter((g) => g.hasReport).length;
+  const candidates = visible.filter((g) => g.verdict === "BET_CANDIDATE").length;
 
   return (
     <main className="page">
@@ -43,11 +44,24 @@ export function Games({ onUnauthorized }: { onUnauthorized: () => void }) {
       {error && <p className="error" role="alert">{error}</p>}
       {!games && !error && <p className="muted">Loading games…</p>}
 
-      {games && leagues.length > 1 && (
-        <select aria-label="Filter by league" value={league} onChange={(e) => setLeague(e.target.value)}>
-          <option value="">All leagues</option>
-          {leagues.map((l) => <option key={l}>{l}</option>)}
-        </select>
+      {games && games.length > 0 && (
+        <>
+          <div className="stats">
+            <div className="stat"><strong>{visible.length}</strong><span>games</span></div>
+            <div className="stat"><strong>{withReport}</strong><span>analysed</span></div>
+            <div className="stat"><strong>{candidates}</strong><span>candidates</span></div>
+          </div>
+          {leagues.length > 1 && (
+            <div className="chips" role="group" aria-label="Filter by league">
+              <button className="chip" aria-pressed={league === ""} onClick={() => setLeague("")}>All</button>
+              {leagues.map((l) => (
+                <button key={l} className="chip" aria-pressed={league === l} onClick={() => setLeague(l)}>
+                  {l.replace(/\s*\(.*\)$/, "")}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {games && grouped.length === 0 && (
@@ -60,33 +74,46 @@ export function Games({ onUnauthorized }: { onUnauthorized: () => void }) {
       {grouped.map(([key, day]) => (
         <section key={key}>
           <h2 className="day">{day.label}</h2>
-          {[...day.byLeague.entries()].map(([name, list]) => (
-            <div key={name} className="league">
-              <h3>{name}</h3>
-              <ul className="games">
-                {list.map((g) => (
-                  <li key={g.id}>
-                    <a href={`#/game/${encodeURIComponent(g.id)}`} className="game">
-                      <span className="time">{time(g.kickoffUtc)}</span>
-                      <span className="teams">
-                        <span>{g.home}</span>
-                        <span>{g.away}</span>
-                      </span>
-                      <span className="meta">
-                        <Badge game={g} />
-                        {g.bestEv !== null && <span className="ev">EV {pct(g.bestEv)}</span>}
-                        <span
-                          className={`dot ${freshness(g.fixturesFetchedAt)}`}
-                          title={`Fixture data fetched ${ageText(g.fixturesFetchedAt)}`}
-                          aria-label={`Data ${freshness(g.fixturesFetchedAt)}`}
-                        />
-                      </span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <ul className="games">
+            {day.list.map((g) => (
+              <li key={g.id}>
+                <a href={`#/game/${encodeURIComponent(g.id)}`} className="game">
+                  <div className="gtop">
+                    <span>{g.leagueName.replace(/\s*\(.*\)$/, "")} · {time(g.kickoffUtc)}</span>
+                    <span
+                      className={`dot ${freshness(g.fixturesFetchedAt)}`}
+                      title={`Fixture data fetched ${ageText(g.fixturesFetchedAt)}`}
+                      aria-label={`Data ${freshness(g.fixturesFetchedAt)}`}
+                    />
+                  </div>
+                  <div className="gmain">
+                    <span className="teams">
+                      <span>{g.home}</span>
+                      <span>{g.away}</span>
+                    </span>
+                    <span className="meta">
+                      <Badge game={g} />
+                      {g.bestEv !== null && <span className="ev">EV {pct(g.bestEv)}</span>}
+                    </span>
+                  </div>
+                  {g.pHome !== null && g.pDraw !== null && g.pAway !== null && (
+                    <>
+                      <div className="prob" role="img" aria-label={`Home ${pct(g.pHome)}, draw ${pct(g.pDraw)}, away ${pct(g.pAway)}`}>
+                        <i className="h" style={{ width: `${g.pHome * 100}%` }} />
+                        <i className="d" style={{ width: `${g.pDraw * 100}%` }} />
+                        <i className="a" style={{ width: `${g.pAway * 100}%` }} />
+                      </div>
+                      <div className="probtext">
+                        <span>{pct(g.pHome)}</span>
+                        <span>{pct(g.pDraw)}</span>
+                        <span>{pct(g.pAway)}</span>
+                      </div>
+                    </>
+                  )}
+                </a>
+              </li>
+            ))}
+          </ul>
         </section>
       ))}
       <Footer />
