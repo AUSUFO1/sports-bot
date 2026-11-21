@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { buildReports } from "./jobs/buildReports";
 import { fetchFootballData } from "./jobs/fetchFootballData";
 import type { Env } from "./types";
 
@@ -34,8 +35,21 @@ app.get("/api/leagues", async (c) => {
 });
 
 app.get("/api/health/details", async (c) => {
-  const last = await c.env.KV.get("lastRun:fetchFootballData");
-  return c.json({ lastFetchRun: last ? JSON.parse(last) : null });
+  const fetchRun = await c.env.KV.get("lastRun:fetchFootballData");
+  const reportRun = await c.env.KV.get("lastRun:buildReports");
+  return c.json({
+    lastFetchRun: fetchRun ? JSON.parse(fetchRun) : null,
+    lastReportRun: reportRun ? JSON.parse(reportRun) : null,
+  });
+});
+
+// Full saved report for one match (read only: no maths happens in a request).
+app.get("/api/games/:id", async (c) => {
+  const row = await c.env.DB.prepare(`SELECT report_json FROM reports WHERE match_id = ?1`)
+    .bind(c.req.param("id"))
+    .first<{ report_json: string }>();
+  if (!row) return c.json({ error: "no report for this match yet" }, 404);
+  return c.json(JSON.parse(row.report_json));
 });
 
 // Manual trigger for the owner (same job as the cron). ?max=1 keeps a test run tiny.
@@ -44,9 +58,15 @@ app.post("/api/jobs/fetch", async (c) => {
   return c.json(await fetchFootballData(c.env, new Date(), max));
 });
 
+app.post("/api/jobs/reports", async (c) => {
+  const max = Math.min(Number(c.req.query("max") ?? 12) || 12, 60);
+  return c.json(await buildReports(c.env, new Date(), max));
+});
+
 export default {
   fetch: app.fetch,
   async scheduled(_e: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(fetchFootballData(env));
+    // Fetch first, then build reports from what is now stored.
+    ctx.waitUntil(fetchFootballData(env).then(() => buildReports(env)));
   },
 };
