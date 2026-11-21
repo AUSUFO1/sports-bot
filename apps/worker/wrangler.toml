@@ -2,13 +2,12 @@ name = "sports-bot-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
-# TODO after Cloudflare login: create D1 + KV, then fill the ids.
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "sports-bot"
-# database_id = ""
-# migrations_dir = "migrations"
-#
-# [[kv_namespaces]]
-# binding = "KV"
-# id = ""
+[[d1_databases]]
+binding = "DB"
+database_name = "sports-bot"
+database_id = "772e52d4-ed58-4e9a-befe-6cbd031a900e"
+migrations_dir = "migrations"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "489532b75c8a4bb2bb233ac29605904c"
