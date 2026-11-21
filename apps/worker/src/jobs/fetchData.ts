@@ -26,6 +26,13 @@ export async function fetchData(env: Env, now = new Date()): Promise<Record<stri
       log.leaguesSynced = leagues.length;
     }
 
+    const blocked = await env.KV.get("plan:blocked");
+    if (blocked) {
+      log.planBlocked = blocked; // do not spend calls while the plan refuses fixtures
+      await env.KV.put("lastRun:fetchData", JSON.stringify({ at: now.toISOString(), ...log }));
+      return log;
+    }
+
     const rows = await env.DB.prepare(`SELECT id, provider_ids FROM leagues WHERE active = 1 ORDER BY id`).all<{
       id: string;
       provider_ids: string;
@@ -55,10 +62,11 @@ export async function fetchData(env: Env, now = new Date()): Promise<Record<stri
           done++;
         } catch (e) {
           if (e instanceof ProviderError && e.kind === "plan") {
-            // The plan does not cover this league or season: note why, retry tomorrow, keep going.
-            await env.KV.put(`fetched:${league.id}`, String(now.getTime() + 19 * 3600_000));
-            log[league.id] = e.message;
-            continue;
+            // A plan limit applies to the whole account, so stop the run instead of burning
+            // the daily quota league by league. Remember why and skip later runs for 6 hours.
+            await env.KV.put("plan:blocked", e.message, { expirationTtl: 6 * 3600 });
+            log.planBlocked = e.message;
+            break;
           }
           throw e;
         }
