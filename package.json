@@ -1,0 +1,13 @@
+{
+  "name": "sports-bot",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b --noEmit || tsc -p packages/stats --noEmit && tsc -p apps/worker --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
