@@ -1,6 +1,6 @@
 import { ApiFootball } from "../providers/apiFootball";
 import { canSpend, recordCall } from "../lib/quota";
-import { upsertFixtures, upsertLeagues } from "../lib/db";
+import { API_FOOTBALL, upsertFixtures, upsertLeagues } from "../lib/db";
 import { ProviderError, type Env } from "../types";
 
 const LEAGUES_EVERY_MS = 7 * 24 * 3600_000;
@@ -21,7 +21,7 @@ export async function fetchData(env: Env, now = new Date()): Promise<Record<stri
     const lastSync = Number((await env.KV.get("leagues:synced")) ?? 0);
     if (now.getTime() - lastSync > LEAGUES_EVERY_MS && (await canSpend(env.KV, "api-football", 1, now))) {
       const leagues = await provider.getLeagues();
-      await upsertLeagues(env.DB, leagues);
+      await upsertLeagues(env.DB, leagues, API_FOOTBALL);
       await env.KV.put("leagues:synced", String(now.getTime()));
       log.leaguesSynced = leagues.length;
     }
@@ -57,7 +57,7 @@ export async function fetchData(env: Env, now = new Date()): Promise<Record<stri
         const to = day(new Date(now.getTime() + FUTURE_DAYS * 86400_000));
         try {
           const fixtures = await provider.getFixtures(String(ids.apiFootball), Number(ids.season), from, to);
-          await upsertFixtures(env.DB, league.id, fixtures, now.toISOString());
+          await upsertFixtures(env.DB, league.id, fixtures, now.toISOString(), API_FOOTBALL);
           await env.KV.put(`fetched:${league.id}`, String(now.getTime()));
           done++;
         } catch (e) {

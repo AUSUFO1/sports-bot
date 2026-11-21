@@ -1,6 +1,5 @@
 import { Hono } from "hono";
-import { fetchData } from "./jobs/fetchData";
-import { callsToday, DAILY_LIMITS } from "./lib/quota";
+import { fetchFootballData } from "./jobs/fetchFootballData";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -35,20 +34,19 @@ app.get("/api/leagues", async (c) => {
 });
 
 app.get("/api/health/details", async (c) => {
-  const used = await callsToday(c.env.KV, "api-football");
-  const last = await c.env.KV.get("lastRun:fetchData");
-  return c.json({
-    quota: { "api-football": { used, limit: DAILY_LIMITS["api-football"] } },
-    lastFetchRun: last ? JSON.parse(last) : null,
-  });
+  const last = await c.env.KV.get("lastRun:fetchFootballData");
+  return c.json({ lastFetchRun: last ? JSON.parse(last) : null });
 });
 
-// Manual trigger for the owner (same job as the cron). Counts against the same quota.
-app.post("/api/jobs/fetch", async (c) => c.json(await fetchData(c.env)));
+// Manual trigger for the owner (same job as the cron). ?max=1 keeps a test run tiny.
+app.post("/api/jobs/fetch", async (c) => {
+  const max = Math.min(Number(c.req.query("max") ?? 3) || 3, 3);
+  return c.json(await fetchFootballData(c.env, new Date(), max));
+});
 
 export default {
   fetch: app.fetch,
   async scheduled(_e: ScheduledController, env: Env, ctx: ExecutionContext) {
-    ctx.waitUntil(fetchData(env));
+    ctx.waitUntil(fetchFootballData(env));
   },
 };

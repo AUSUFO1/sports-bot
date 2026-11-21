@@ -1,0 +1,69 @@
+import { FootballData } from "../providers/footballData";
+import { FOOTBALL_DATA, upsertFixtures, upsertLeagues } from "../lib/db";
+import { ProviderError, type Env } from "../types";
+
+const LEAGUES_EVERY_MS = 7 * 24 * 3600_000;
+const LEAGUE_REFRESH_MS = 5 * 3600_000;
+const LEAGUES_PER_RUN = 3; // free Workers allow 50 queries per run; each league uses about a dozen
+const GAP_MS = 7000; // free plan allows 10 calls per minute
+const PAST_DAYS = 2;
+const FUTURE_DAYS = 7; // the free plan allows at most 10 days per request
+
+const day = (d: Date) => d.toISOString().slice(0, 10);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * One cron run. A league with no matches stored yet loads its whole season in one call;
+ * after that it only refreshes a small window around today. `maxLeagues` lets a manual test
+ * run stay tiny.
+ */
+export async function fetchFootballData(env: Env, now = new Date(), maxLeagues = LEAGUES_PER_RUN) {
+  if (!env.FOOTBALL_DATA_KEY) return { skipped: "FOOTBALL_DATA_KEY not set" };
+  let calls = 0;
+  const provider = new FootballData(env.FOOTBALL_DATA_KEY, async () => {
+    if (calls++ > 0) await sleep(GAP_MS);
+  });
+  const log: Record<string, unknown> = {};
+
+  try {
+    const lastSync = Number((await env.KV.get("fd:leagues:synced")) ?? 0);
+    if (now.getTime() - lastSync > LEAGUES_EVERY_MS) {
+      const leagues = await provider.getLeagues();
+      await upsertLeagues(env.DB, leagues, FOOTBALL_DATA);
+      await env.KV.put("fd:leagues:synced", String(now.getTime()));
+      log.leaguesSynced = leagues.length;
+    }
+
+    const rows = await env.DB.prepare(
+      `SELECT l.id, l.provider_ids, (SELECT COUNT(*) FROM matches m WHERE m.league_id = l.id) AS n
+       FROM leagues l WHERE l.active = 1 AND l.id LIKE 'fd-%' ORDER BY l.id`,
+    ).all<{ id: string; provider_ids: string; n: number }>();
+    const todo = rows.results.filter((r) => JSON.parse(r.provider_ids).season != null);
+
+    if (todo.length > 0) {
+      let cursor = Number((await env.KV.get("fd:cursor")) ?? 0) % todo.length;
+      let done = 0;
+      for (let i = 0; i < todo.length && done < maxLeagues; i++) {
+        const league = todo[cursor]!;
+        cursor = (cursor + 1) % todo.length;
+        const last = Number((await env.KV.get(`fd:fetched:${league.id}`)) ?? 0);
+        if (now.getTime() - last < LEAGUE_REFRESH_MS) continue; // cached, nothing to refetch
+        const ids = JSON.parse(league.provider_ids);
+        const full = league.n === 0;
+        const from = full ? "" : day(new Date(now.getTime() - PAST_DAYS * 86400_000));
+        const to = full ? "" : day(new Date(now.getTime() + FUTURE_DAYS * 86400_000));
+        const fixtures = await provider.getFixtures(String(ids.footballData), Number(ids.season), from, to);
+        await upsertFixtures(env.DB, league.id, fixtures, now.toISOString(), FOOTBALL_DATA);
+        await env.KV.put(`fd:fetched:${league.id}`, String(now.getTime()));
+        log[league.id] = `${fixtures.length} matches (${full ? "full season" : "window"})`;
+        done++;
+      }
+      await env.KV.put("fd:cursor", String(cursor));
+    }
+  } catch (e) {
+    // Any provider error stops this run; the next run starts again from the cursor.
+    log.error = e instanceof ProviderError ? `${e.kind}: ${e.message}` : String(e);
+  }
+  await env.KV.put("lastRun:fetchFootballData", JSON.stringify({ at: now.toISOString(), calls, ...log }));
+  return { calls, ...log };
+}

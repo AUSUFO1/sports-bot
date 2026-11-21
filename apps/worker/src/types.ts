@@ -3,6 +3,7 @@ export interface Env {
   KV: KVNamespace;
   APP_TOKEN?: string;
   API_FOOTBALL_KEY?: string;
+  FOOTBALL_DATA_KEY?: string;
 }
 
 export interface LeagueInfo {
