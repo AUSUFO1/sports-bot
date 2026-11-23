@@ -7,6 +7,7 @@ import { Picks } from "./pages/Picks";
 import { History } from "./pages/History";
 import { Footer } from "./components/Footer";
 import { isDark, setTheme } from "./theme";
+import { BRAND_MARK, BRAND_NAME } from "./brand";
 
 function useRoute(): string {
   const [route, setRoute] = useState(window.location.hash || "#/");
@@ -22,8 +23,8 @@ function TokenScreen({ onSaved, message }: { onSaved: () => void; message?: stri
   const [value, setValue] = useState("");
   return (
     <main className="page narrow">
-      <span className="mark" aria-hidden>DT</span>
-      <h1>Data Is <span style={{ color: "var(--accent)" }}>Truth</span></h1>
+      <span className="mark" aria-hidden>{BRAND_MARK}</span>
+      <h1>{BRAND_NAME}<span style={{ color: "var(--accent)" }}>.</span></h1>
       <p className="lead">Personal sports analysis. Enter your access token to continue. It stays in this browser only.</p>
       {message && <p className="error">{message}</p>}
       <form
@@ -69,8 +70,8 @@ export function App() {
     <>
       <header className="topbar">
         <a href="#/" className="brand">
-          <span className="mark" aria-hidden>DT</span>
-          <span>Data Is <b>Truth</b></span>
+          <span className="mark" aria-hidden>{BRAND_MARK}</span>
+          <span>{BRAND_NAME}<b>.</b></span>
         </a>
         <nav>
           <button className="iconbtn" aria-label="Switch light or dark" onClick={flipTheme}>{dark ? "☀" : "☾"}</button>

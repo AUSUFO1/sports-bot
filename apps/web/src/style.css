@@ -118,7 +118,7 @@ h3 { font-size: 0.95rem; margin: 1rem 0 0.5rem; font-weight: 600; }
 
 .page { max-width: 680px; margin: 0 auto; padding: 20px 20px 48px; }
 .page.narrow { max-width: 420px; padding-top: 72px; }
-.row { display: flex; align-items: center; gap: 12px; }
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .between { justify-content: space-between; }
 .lead { color: var(--muted); margin: 0 0 18px; }
 
@@ -138,11 +138,17 @@ button.link { background: none; border: 0; color: var(--muted); padding: 6px 0; 
 .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 14px 0 18px; }
 .stat { background: var(--soft); border-radius: 14px; padding: 12px; min-width: 0; }
 .stat span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.stat strong { display: block; font-size: 1.6rem; letter-spacing: -0.03em; line-height: 1.1; }
+.stat strong { display: block; font-size: clamp(1.1rem, 6vw, 1.6rem); letter-spacing: -0.03em; line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (max-width: 400px) { .stat { padding: 10px; } }
 .stat span { font-size: 0.74rem; color: var(--muted); }
-.chips { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 6px; margin: 0 -20px 6px; padding-left: 20px; padding-right: 20px; scrollbar-width: none; }
-.chips::-webkit-scrollbar { display: none; }
-.chip { flex: none; width: auto; min-height: 38px; padding: 6px 14px; border-radius: 999px; background: var(--card); color: var(--fg); border: 1px solid var(--line); font-weight: 500; font-size: 0.88rem; }
+/* Pills wrap onto new lines everywhere, so none is ever cut off at the screen edge. */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; padding: 2px 0; }
+.chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: none; width: auto; min-width: 40px; min-height: 40px; padding: 0 14px; line-height: 1;
+  border-radius: 999px; background: var(--card); color: var(--fg); border: 1px solid var(--line);
+  font-weight: 500; font-size: 0.88rem; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
 
 /* game list */
@@ -168,7 +174,7 @@ button.link { background: none; border: 0; color: var(--muted); padding: 6px 0; 
 .prob .a { background: var(--away); }
 .probtext { display: flex; justify-content: space-between; font-size: 0.74rem; color: var(--muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
-.badge { font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.06em; white-space: nowrap; }
+.badge { display: inline-flex; align-items: center; justify-content: center; font-size: 0.68rem; font-weight: 700; line-height: 1; min-height: 22px; padding: 0 8px; border-radius: 6px; letter-spacing: 0.06em; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .badge.nobet { background: var(--soft); color: var(--muted); }
 .badge.candidate { background: var(--good-bg); color: var(--good); }
 .badge.pending { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
@@ -230,10 +236,24 @@ tr.hit td { color: var(--good); font-weight: 700; }
 .g-draw { --pc: var(--c-draw); }
 .g-goals { --pc: var(--c-goals); }
 .g-btts { --pc: var(--c-btts); }
-.tag { font-size: 0.66rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pc); background: color-mix(in srgb, var(--pc) 14%, transparent); white-space: nowrap; }
+.tag { display: inline-flex; align-items: center; justify-content: center; line-height: 1; min-height: 22px; font-size: 0.66rem; font-weight: 700; padding: 0 8px; border-radius: 6px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pc); background: color-mix(in srgb, var(--pc) 14%, transparent); white-space: nowrap; }
 .pickrow .fill { background: var(--pc); }
 .pickrow strong { color: var(--pc); }
 
+.filters { display: grid; gap: 10px; margin: 6px 0 14px; }
+/* In filters the pills wrap onto new lines so nothing is cut off at the edge. */
+.filters .chips { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+.filters .chip { min-height: 40px; }
+.field { display: grid; gap: 4px; font-size: 0.78rem; color: var(--muted); min-width: 0; }
+.field input, .field select { margin: 0; width: 100%; }
+.fieldrow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.summary { background: var(--soft); border-radius: 18px; padding: 16px; margin: 6px 0 8px; }
+.sumline { font-size: 1.35rem; letter-spacing: -0.02em; line-height: 1.2; }
+.sumline .good { color: var(--good); font-weight: 600; }
+.summary .stats { margin: 12px 0 0; }
+.summary .stat { background: var(--card); }
+tr.tap { cursor: pointer; }
+tr.tap:hover td { background: var(--soft); }
 .crests { display: flex; gap: 12px; margin: 6px 0 10px; }
 .pickname { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
 .meta .tag { align-self: flex-end; }

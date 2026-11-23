@@ -155,7 +155,7 @@ app.get("/api/history", async (c) => {
      JOIN leagues l ON l.id = m.league_id
      JOIN teams ht ON ht.id = m.home_team_id
      JOIN teams at2 ON at2.id = m.away_team_id
-     ORDER BY p.kickoff_utc DESC LIMIT 300`,
+     ORDER BY p.kickoff_utc DESC LIMIT 1000`,
   ).all();
   const byMarket = await c.env.DB.prepare(
     `SELECT market, selection, SUM(result = 'win') AS wins, SUM(result = 'loss') AS losses
