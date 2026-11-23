@@ -26,7 +26,7 @@ export async function buildReports(env: Env, now = new Date(), cap = DEFAULT_CAP
      JOIN teams at2 ON at2.id = m.away_team_id
      LEFT JOIN reports r ON r.match_id = m.id
      WHERE m.status = 'scheduled' AND m.kickoff_utc >= ?1 AND m.kickoff_utc <= ?2
-       AND (r.match_id IS NULL OR r.created_at < ?3)
+       AND (r.match_id IS NULL OR r.created_at < ?3 OR json_extract(r.report_json, '$.picks') IS NULL)
      ORDER BY m.kickoff_utc LIMIT ?4`,
   )
     .bind(now.toISOString(), end, staleBefore, cap)

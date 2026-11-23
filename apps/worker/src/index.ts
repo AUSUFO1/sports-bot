@@ -194,12 +194,18 @@ app.post("/api/jobs/reports", async (c) => {
 
 export default {
   fetch: app.fetch,
-  async scheduled(_e: ScheduledController, env: Env, ctx: ExecutionContext) {
-    // Fetch first, then build reports and log picks, then settle finished games.
-    ctx.waitUntil(
-      fetchFootballData(env)
-        .then(() => buildReports(env))
-        .then(() => settlePicks(env)),
-    );
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    if (event.cron === "0 * * * *") {
+      // On the hour: fetch data, then build reports and log picks, then settle finished games.
+      ctx.waitUntil(
+        fetchFootballData(env)
+          .then(() => buildReports(env))
+          .then(() => settlePicks(env)),
+      );
+    } else {
+      // At :20 and :40: only build reports. Each trigger is its own run with its own CPU allowance,
+      // so more reports get built per hour without risking the free 10 ms limit in one run.
+      ctx.waitUntil(buildReports(env));
+    }
   },
 };
