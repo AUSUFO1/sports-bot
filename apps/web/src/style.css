@@ -254,6 +254,22 @@ tr.hit td { color: var(--good); font-weight: 700; }
 .summary .stat { background: var(--card); }
 tr.tap { cursor: pointer; }
 tr.tap:hover td { background: var(--soft); }
+/* Small phones: let table text wrap and tighten spacing so tables fit without sideways scrolling. */
+@media (max-width: 400px) {
+  .tablewrap { padding: 2px 4px; }
+  table { font-size: 0.76rem; }
+  th, td { padding: 8px 4px; white-space: normal; }
+  th { font-size: 0.64rem; letter-spacing: 0.04em; }
+  td:nth-child(n + 3), th:nth-child(n + 3) { white-space: nowrap; }
+}
+.ai { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 16px 14px; }
+.ai h3 { margin-top: 14px; }
+.ai ul { margin: 6px 0; padding-left: 18px; }
+.ai li { margin: 4px 0; }
+.aiverdict { font-weight: 700; margin: 12px 0 8px; }
+.airec { background: var(--good-bg); border-radius: 10px; padding: 8px 12px; }
+.skiplist li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+.skiplist li:last-child { border-bottom: 0; }
 .refline { grid-column: 1 / -1; font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 .takeline { grid-column: 1 / -1; font-size: 0.88rem; }
 .takeline strong { color: var(--fg); }

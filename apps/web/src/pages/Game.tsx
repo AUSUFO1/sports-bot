@@ -3,6 +3,7 @@ import { api, ApiError, type Report } from "../api";
 import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, pct, pickLabel, signedPct, time } from "../format";
 import { Footer } from "../components/Footer";
 import { Crest } from "../components/Crest";
+import { AiSection } from "../components/AiSection";
 
 export function Game({ id, onUnauthorized }: { id: string; onUnauthorized: () => void }) {
   const [r, setR] = useState<Report | null>(null);
@@ -25,13 +26,13 @@ export function Game({ id, onUnauthorized }: { id: string; onUnauthorized: () =>
       <a href="#/" className="back">← All games</a>
       {error && <p className="error" role="alert">{error}</p>}
       {!r && !error && <p className="muted">Loading report…</p>}
-      {r && <Detail r={r} />}
+      {r && <Detail r={r} onUnauthorized={onUnauthorized} />}
       <Footer modelVersion={r?.model?.version} />
     </main>
   );
 }
 
-function Detail({ r }: { r: Report }) {
+function Detail({ r, onUnauthorized }: { r: Report; onUnauthorized: () => void }) {
   const fx = freshness(r.dataFreshness.fixtures);
   const markets = r.model ? Object.keys(r.model.probabilities) : [];
   return (
@@ -181,10 +182,7 @@ function Detail({ r }: { r: Report }) {
         </>
       )}
 
-      <section>
-        <h2>AI analysis</h2>
-        <p className="muted">Not available yet. It arrives in a later phase and will only explain the numbers above.</p>
-      </section>
+      <AiSection matchId={r.matchId} onUnauthorized={onUnauthorized} />
     </>
   );
 }

@@ -24,17 +24,46 @@ export class ApiError extends Error {
   }
 }
 
-export async function api<T>(path: string): Promise<T> {
+export async function api<T>(path: string, method: "GET" | "POST" = "GET"): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, { headers: { Authorization: `Bearer ${getToken()}` } });
+    res = await fetch(`${BASE}${path}`, { method, headers: { Authorization: `Bearer ${getToken()}` } });
   } catch {
     throw new ApiError(0, "Cannot reach the server. Check your internet and try again.");
   }
   if (res.status === 401) throw new ApiError(401, "That token was not accepted.");
   if (res.status === 404) throw new ApiError(404, "Not found.");
-  if (!res.ok) throw new ApiError(res.status, `Server error (${res.status}).`);
+  if (!res.ok) {
+    // The server writes a plain-words reason for AI failures (limit reached, providers busy); show it when present.
+    let reason = `Server error (${res.status}).`;
+    try {
+      const body = (await res.json()) as { error?: string };
+      if (body.error) reason = body.error;
+    } catch {
+      /* keep the generic message */
+    }
+    throw new ApiError(res.status, reason);
+  }
   return (await res.json()) as T;
+}
+
+export interface AiAnalysis {
+  provider: string;
+  model: string;
+  cached: boolean;
+  createdAt: string;
+  /** written by code, never by the AI */
+  verdictLine: string;
+  analysis: {
+    summary: string;
+    keyFactors: string[];
+    risks: string[];
+    recommendation: { market: string; selection: string } | null;
+    skip: { market: string; selection: string; reason: string }[];
+    reasoning: string;
+  };
+  issues: string[];
+  numberMismatches: string[];
 }
 
 export interface Game {

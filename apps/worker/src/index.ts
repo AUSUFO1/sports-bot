@@ -5,6 +5,7 @@ import { buildReports } from "./jobs/buildReports";
 import { fetchFootballData } from "./jobs/fetchFootballData";
 import { settlePicks } from "./jobs/settlePicks";
 import { registerOddsRoutes } from "./routes/odds";
+import { analyseMatch, savedAnalysis } from "./ai/analyse";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -61,6 +62,16 @@ app.get("/api/health/details", async (c) => {
     lastFetchRun: fetchRun ? JSON.parse(fetchRun) : null,
     lastReportRun: reportRun ? JSON.parse(reportRun) : null,
   });
+});
+
+// AI analysis. Reads the saved report only; the AI explains numbers the backend already produced.
+app.get("/api/games/:id/analysis", async (c) => {
+  const r = await savedAnalysis(c.env, c.req.param("id"));
+  return r.ok ? c.json(r.value) : c.json({ error: r.message }, r.status as 404);
+});
+app.post("/api/games/:id/analyse", async (c) => {
+  const r = await analyseMatch(c.env, c.req.param("id"));
+  return r.ok ? c.json(r.value) : c.json({ error: r.message, attempts: r.attempts ?? [] }, r.status as 404 | 429 | 502 | 503);
 });
 
 // Upcoming games with the verdict badge and data freshness. Reads saved reports only (no maths here).
