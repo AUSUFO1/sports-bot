@@ -23,6 +23,8 @@ export interface ReportLike {
   verdict: "BET_CANDIDATE" | "NO_BET";
   shortlist: { market: string; selection: string }[];
   picks?: { market: string; selection: string }[];
+  /** when the odds were captured; null means no bookmaker odds yet */
+  dataFreshness?: { odds: string | null };
 }
 
 /** What the AI is allowed to know about past results. Computed in code from the picks log. */
@@ -49,9 +51,16 @@ const MAX_ITEM = 400;
 const CERTAINTY = /\b(guarantee[ds]?|guaranteed win|100% (?:sure|certain|safe)|certain to win|sure win|sure thing|cannot lose|can't lose|risk[- ]free|lock)\b/i;
 
 export const VERDICT_LINES = {
-  NO_BET: "Verdict: NO BET. The data shows no value edge here.",
-  BET_CANDIDATE: "Verdict: candidate. The data shows value, but it is an estimate, not a promise.",
+  NO_ODDS: "Odds pending: the picks are the model's view; value cannot be checked until bookmaker odds arrive.",
+  NO_BET: "No value at the current odds: the model has a view, but the price is too low to be worth it.",
+  BET_CANDIDATE: "Value found: the odds pay more than the model thinks is fair. Still an estimate, not a promise.",
 } as const;
+
+/** The verdict line is written by code: value found, no value at these odds, or odds not in yet. */
+export function verdictLineFor(report: ReportLike): string {
+  if (report.verdict === "BET_CANDIDATE") return VERDICT_LINES.BET_CANDIDATE;
+  return report.dataFreshness?.odds ? VERDICT_LINES.NO_BET : VERDICT_LINES.NO_ODDS;
+}
 
 /** Pulls the first JSON object out of a model reply, tolerating ``` fences and chatter around it. */
 export function parseModelJson(text: string): unknown | null {
@@ -113,7 +122,7 @@ const isStr = (v: unknown): v is string => typeof v === "string";
 const clean = (s: string, max: number) => s.trim().slice(0, max);
 
 export function validateAnalysis(raw: unknown, report: ReportLike, data: { report: unknown; history: HistorySummary }): GuardResult {
-  const verdictLine = VERDICT_LINES[report.verdict];
+  const verdictLine = verdictLineFor(report);
   const reject = (issue: string): GuardResult => ({ ok: false, issues: [issue], analysis: null, numberMismatches: [], verdictLine });
   const issues: string[] = [];
 
@@ -146,7 +155,7 @@ export function validateAnalysis(raw: unknown, report: ReportLike, data: { repor
   if (rec) {
     const inShortlist = report.shortlist.some((s) => s.market === rec.market && s.selection === rec.selection);
     if (report.verdict === "NO_BET") {
-      issues.push("The verdict is NO BET, so the recommendation was removed by code.");
+      issues.push("No value was found at these odds, so the recommendation was removed by code.");
     } else if (!inShortlist) {
       return reject("recommended a selection that is not in the shortlist");
     } else {

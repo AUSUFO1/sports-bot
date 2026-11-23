@@ -1,4 +1,4 @@
-import { parseModelJson, validateAnalysis, type Analysis, type HistorySummary, type ReportLike } from "@sports/stats";
+import { parseModelJson, validateAnalysis, verdictLineFor, type Analysis, type HistorySummary, type ReportLike } from "@sports/stats";
 import type { Env } from "../types";
 import { AiCallError, availableProviders, callProvider } from "./providers";
 import { SYSTEM_PROMPT, userPrompt } from "./prompts";
@@ -53,20 +53,22 @@ interface Stored {
   numberMismatches: string[];
 }
 
-async function cached(env: Env, matchId: string, hash: string): Promise<AnalysisResponse | null> {
+async function cached(env: Env, matchId: string, hash: string, reportJson: string): Promise<AnalysisResponse | null> {
   const row = await env.DB.prepare(`SELECT provider, analysis_json, created_at FROM ai_analyses WHERE match_id = ?1 AND report_hash = ?2`)
     .bind(matchId, hash)
     .first<{ provider: string; analysis_json: string; created_at: string }>();
   if (!row) return null;
   const s = JSON.parse(row.analysis_json) as Stored;
-  return { provider: row.provider, model: s.model, cached: true, createdAt: row.created_at, verdictLine: s.verdictLine, analysis: s.analysis, issues: s.issues, numberMismatches: s.numberMismatches };
+  // The verdict line is always rebuilt from the report with the current wording, never taken from an old save.
+  const verdictLine = verdictLineFor(JSON.parse(reportJson) as ReportLike);
+  return { provider: row.provider, model: s.model, cached: true, createdAt: row.created_at, verdictLine, analysis: s.analysis, issues: s.issues, numberMismatches: s.numberMismatches };
 }
 
 /** Saved analysis for the CURRENT report, if there is one. Never calls an AI. */
 export async function savedAnalysis(env: Env, matchId: string): Promise<AnalyseResult> {
   const report = await loadReport(env, matchId);
   if (!report) return { ok: false, status: 404, message: "No report for this game yet." };
-  const hit = await cached(env, matchId, report.hash);
+  const hit = await cached(env, matchId, report.hash, report.json);
   return hit ? { ok: true, value: hit } : { ok: false, status: 404, message: "No analysis yet for the current report." };
 }
 
@@ -75,7 +77,7 @@ export async function analyseMatch(env: Env, matchId: string): Promise<AnalyseRe
   const report = await loadReport(env, matchId);
   if (!report) return { ok: false, status: 404, message: "No report for this game yet. It is built after the data job runs." };
 
-  const hit = await cached(env, matchId, report.hash); // the same unchanged report never costs a second AI call
+  const hit = await cached(env, matchId, report.hash, report.json); // the same unchanged report never costs a second AI call
   if (hit) return { ok: true, value: hit };
 
   const providers = availableProviders(env);

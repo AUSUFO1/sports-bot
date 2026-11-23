@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type Report } from "../api";
-import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, pct, pickLabel, signedPct, time } from "../format";
+import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, modelLean, pct, pickLabel, SCORING_NAMES, scoringOf, signedPct, time } from "../format";
 import { Footer } from "../components/Footer";
 import { Crest } from "../components/Crest";
 import { AiSection } from "../components/AiSection";
@@ -35,6 +35,11 @@ export function Game({ id, onUnauthorized }: { id: string; onUnauthorized: () =>
 function Detail({ r, onUnauthorized }: { r: Report; onUnauthorized: () => void }) {
   const fx = freshness(r.dataFreshness.fixtures);
   const markets = r.model ? Object.keys(r.model.probabilities) : [];
+  const p1 = r.model?.probabilities["1x2"];
+  const lean = p1 ? modelLean(p1.home ?? null, p1.draw ?? null, p1.away ?? null) : null;
+  const scoring = scoringOf(r.model?.probabilities.ou_2_5?.over);
+  const value: "value" | "novalue" | "pending" =
+    r.verdict === "BET_CANDIDATE" ? "value" : r.dataFreshness.odds ? "novalue" : "pending";
   return (
     <>
       <header className="gamehead">
@@ -50,15 +55,27 @@ function Detail({ r, onUnauthorized }: { r: Report; onUnauthorized: () => void }
         </p>
       </header>
 
-      <section className={`verdict ${r.verdict === "BET_CANDIDATE" ? "candidate" : "nobet"}`}>
-        <div>
-          <div className="big">{r.verdict === "BET_CANDIDATE" ? "Candidate" : "No bet"}</div>
-          <div className="conf">Confidence {r.confidence}</div>
+      {(lean || scoring) && (
+        <section className="modelview">
+          <div className="mvlabel">Model view</div>
+          {lean && <div className="big">{lean.label} <span className="mvpct">{pct(lean.prob)}</span></div>}
+          <div className="mvrow">
+            {scoring && <span className={"scoring s-" + scoring}>{SCORING_NAMES[scoring]}</span>}
+            <span className="conf">Confidence {r.confidence}</span>
+          </div>
+        </section>
+      )}
+
+      <section className={"verdict v-" + value}>
+        <div className="big">
+          {value === "value" ? "Value found" : value === "novalue" ? "No value at these odds" : "Odds pending"}
         </div>
         <p>
-          {r.verdict === "BET_CANDIDATE"
-            ? "The data shows value on the selections below. It is an estimate, not a promise."
-            : "The data shows no edge here."}
+          {value === "value"
+            ? "The odds pay more than the model thinks is fair on the selections below. Still an estimate, not a promise."
+            : value === "novalue"
+              ? "The model has a view, but the bookmakers' prices are too low to be worth it."
+              : "Bookmaker odds are not in yet, so value cannot be checked. The model's view is above."}
         </p>
         {r.shortlist.length > 0 && (
           <ul className="plain">

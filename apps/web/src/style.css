@@ -298,3 +298,32 @@ tr.tap:hover td { background: var(--soft); }
 .combo strong { display: block; font-size: 1.4rem; letter-spacing: -0.02em; }
 .combo span { font-size: 0.74rem; color: var(--muted); }
 .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }
+
+/* Value label (replaces NO BET) */
+.badge.v-value { background: var(--good-bg); color: var(--good); }
+.badge.v-novalue { background: var(--soft); color: var(--muted); }
+.badge.v-pending, .badge.v-noreport { background: transparent; color: var(--muted); border: 1px dashed var(--line); }
+
+/* Low / average / high scoring */
+.scoring { display: inline-flex; align-items: center; min-height: 22px; padding: 0 8px; border-radius: 6px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; line-height: 1; }
+.scoring.s-high { color: var(--c-goals); background: color-mix(in srgb, var(--c-goals) 14%, transparent); }
+.scoring.s-low { color: var(--c-draw); background: color-mix(in srgb, var(--c-draw) 14%, transparent); }
+.scoring.s-average { color: var(--muted); background: var(--soft); }
+.gmain .scoring { align-self: center; }
+
+/* The model's view on each card and on the game page */
+.modelline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; margin-top: 10px; font-size: 0.86rem; color: var(--muted); }
+.modelline strong { color: var(--fg); }
+.modelview { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 16px 18px; margin: 18px 0 10px; }
+.mvlabel { font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.modelview .big { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; margin-top: 4px; }
+.mvpct { color: var(--c-result); }
+.mvrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 8px; }
+.modelview .conf { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+/* Value card on the game page: soft when there is no value, green when there is */
+.verdict.v-novalue, .verdict.v-pending { background: var(--soft); color: var(--fg); }
+.verdict.v-value { background: var(--good-bg); color: var(--fg); border: 1px solid var(--good); }
+.verdict .big { font-size: 1.25rem; }
+
+.catpills { margin: 16px 0 4px; }

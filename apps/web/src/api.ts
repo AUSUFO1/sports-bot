@@ -85,6 +85,8 @@ export interface Game {
   pHome: number | null;
   pDraw: number | null;
   pAway: number | null;
+  /** model chance of over 2.5 goals, drives the low/high scoring label */
+  pOver25: number | null;
 }
 
 export interface LeagueRow {
@@ -104,6 +106,7 @@ export interface PickRow {
   homeCrest: string | null;
   awayCrest: string | null;
   predictedScore: string | null;
+  pOver25: number | null;
   confidence: string | null;
   market: string;
   selection: string;

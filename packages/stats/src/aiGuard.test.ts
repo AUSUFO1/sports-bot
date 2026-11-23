@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectNumbers, findNumberMismatches, numberIsKnown, parseModelJson, validateAnalysis, VERDICT_LINES, type HistorySummary, type ReportLike } from "./aiGuard";
+import { collectNumbers, findNumberMismatches, numberIsKnown, parseModelJson, validateAnalysis, VERDICT_LINES, verdictLineFor, type HistorySummary, type ReportLike } from "./aiGuard";
 
 const history: HistorySummary = {
   overall: { won: 14, lost: 10, waiting: 37 },
@@ -102,7 +102,7 @@ describe("validateAnalysis", () => {
     const r = validateAnalysis({ ...good, recommendation: { market: "1x2", selection: "home" } }, noBet, data);
     expect(r.ok).toBe(true);
     expect(r.analysis!.recommendation).toBeNull();
-    expect(r.issues.join(" ")).toMatch(/NO BET, so the recommendation was removed/);
+    expect(r.issues.join(" ")).toMatch(/No value was found at these odds, so the recommendation was removed/);
   });
   it("candidate: a recommendation outside the shortlist rejects the whole answer", () => {
     const r = validateAnalysis({ ...good, recommendation: { market: "1x2", selection: "home" } }, candidate, data);
@@ -135,8 +135,10 @@ describe("validateAnalysis", () => {
     expect(validateAnalysis({ ...good, reasoning: undefined }, noBet, data).ok).toBe(false);
     expect(validateAnalysis({ ...good, recommendation: { market: 5 } }, noBet, data).ok).toBe(false);
   });
-  it("the verdict line is written by code and matches the verdict", () => {
-    expect(validateAnalysis(good, noBet, data).verdictLine).toBe(VERDICT_LINES.NO_BET);
+  it("the verdict line is written by code: value found, no value at these odds, or odds pending", () => {
+    expect(validateAnalysis(good, noBet, data).verdictLine).toBe(VERDICT_LINES.NO_ODDS); // no odds yet
+    expect(verdictLineFor({ ...noBet, dataFreshness: { odds: "2026-11-23T06:00:00Z" } })).toBe(VERDICT_LINES.NO_BET);
+    expect(VERDICT_LINES.NO_BET).not.toMatch(/NO BET/);
     expect(validateAnalysis(good, candidate, data).verdictLine).toBe(VERDICT_LINES.BET_CANDIDATE);
     expect(validateAnalysis(null, candidate, data).verdictLine).toBe(VERDICT_LINES.BET_CANDIDATE);
   });

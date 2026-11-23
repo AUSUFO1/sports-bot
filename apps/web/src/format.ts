@@ -55,3 +55,53 @@ export function freshness(iso: string | null): "fresh" | "aging" | "stale" {
   const h = ageHours(iso);
   return h === null || h > 48 ? "stale" : h > 12 ? "aging" : "fresh";
 }
+
+/** Low / average / high scoring, from the model's chance of over 2.5 goals: high at 60%+, low at 40% or less. */
+export type Scoring = "low" | "average" | "high";
+export function scoringOf(pOver25: number | null | undefined): Scoring | null {
+  if (pOver25 === null || pOver25 === undefined) return null;
+  if (pOver25 >= 0.6) return "high";
+  if (pOver25 <= 0.4) return "low";
+  return "average";
+}
+export const SCORING_NAMES: Record<Scoring, string> = { low: "Low-scoring", average: "Average goals", high: "High-scoring" };
+
+/** The value label that replaces "NO BET": value found, no value at these odds, or odds not in yet. */
+export type ValueState = "value" | "novalue" | "pending" | "noreport";
+export function valueStateOf(g: { hasReport: boolean; verdict: string | null; oddsFetchedAt: string | null }): ValueState {
+  if (!g.hasReport) return "noreport";
+  if (g.verdict === "BET_CANDIDATE") return "value";
+  return g.oddsFetchedAt ? "novalue" : "pending";
+}
+export const VALUE_NAMES: Record<ValueState, string> = {
+  value: "VALUE ✓",
+  novalue: "NO VALUE",
+  pending: "ODDS PENDING",
+  noreport: "NO REPORT YET",
+};
+
+/** The model's most likely result, e.g. { label: "Home win", prob: 0.6 }. */
+export function modelLean(pHome: number | null, pDraw: number | null, pAway: number | null): { label: string; prob: number } | null {
+  if (pHome === null || pDraw === null || pAway === null) return null;
+  const opts = [
+    { label: "Home win", prob: pHome },
+    { label: "Draw", prob: pDraw },
+    { label: "Away win", prob: pAway },
+  ];
+  return opts.sort((a, b) => b.prob - a.prob)[0]!;
+}
+
+/** The "of the day" categories for the pills on the Picks page. */
+export type Category = "under" | "over" | "btts" | "draw" | "win";
+export function categoryOf(market: string, selection: string): Category {
+  if (market.startsWith("ou_")) return selection === "under" ? "under" : "over";
+  if (market === "btts") return "btts";
+  return selection === "draw" ? "draw" : "win";
+}
+export const CATEGORY_NAMES: Record<Category, string> = {
+  under: "Unders",
+  over: "Overs",
+  btts: "BTTS",
+  draw: "Draws",
+  win: "Wins",
+};

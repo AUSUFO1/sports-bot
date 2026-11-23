@@ -91,6 +91,7 @@ app.get("/api/games", async (c) => {
             json_extract(r.report_json, '$.model.probabilities."1x2".home') AS pHome,
             json_extract(r.report_json, '$.model.probabilities."1x2".draw') AS pDraw,
             json_extract(r.report_json, '$.model.probabilities."1x2".away') AS pAway,
+            json_extract(r.report_json, '$.model.probabilities.ou_2_5.over') AS pOver25,
             (SELECT MAX(json_extract(v.value, '$.ev')) FROM json_each(r.report_json, '$.shortlist') v) AS bestEv
      FROM matches m
      JOIN leagues l ON l.id = m.league_id
@@ -126,6 +127,7 @@ async function upcomingPicks(env: Env) {
     `SELECT m.id AS matchId, l.name AS leagueName, m.kickoff_utc AS kickoffUtc, ht.name AS home, at2.name AS away,
             ht.crest AS homeCrest, at2.crest AS awayCrest,
             json_extract(r.report_json, '$.predictedScore') AS predictedScore,
+            json_extract(r.report_json, '$.model.probabilities.ou_2_5.over') AS pOver25,
             json_extract(r.report_json, '$.confidence') AS confidence,
             json_extract(p.value, '$.market') AS market, json_extract(p.value, '$.selection') AS selection,
             json_extract(p.value, '$.modelProb') AS modelProb, json_extract(p.value, '$.strength') AS strength,

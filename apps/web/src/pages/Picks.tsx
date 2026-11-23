@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type PickRow, type Ticket } from "../api";
-import { dayKey, dayLabel, GROUP_NAMES, pct, pickGroup, pickLabel, time } from "../format";
+import { CATEGORY_NAMES, categoryOf, dayKey, dayLabel, GROUP_NAMES, pct, pickGroup, pickLabel, SCORING_NAMES, scoringOf, time, type Category } from "../format";
 import { Footer } from "../components/Footer";
 import { Crest } from "../components/Crest";
 
@@ -10,6 +10,7 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [legs, setLegs] = useState(4);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [cat, setCat] = useState<Category | "all">("all");
 
   const fail = (e: unknown) => {
     if (e instanceof ApiError && e.status === 401) return onUnauthorized();
@@ -22,9 +23,17 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
     api<Ticket>(`/api/ticket?legs=${legs}`).then(setTicket).catch(fail);
   }, [legs]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Category pills: Unders / Overs / BTTS / Draws / Wins of the day.
+  const counts = useMemo(() => {
+    const c: Record<Category, number> = { under: 0, over: 0, btts: 0, draw: 0, win: 0 };
+    for (const p of picks ?? []) c[categoryOf(p.market, p.selection)]++;
+    return c;
+  }, [picks]);
+
   const grouped = useMemo(() => {
     const byMatch = new Map<string, PickRow[]>();
-    for (const p of picks ?? []) {
+    const shown = (picks ?? []).filter((p) => cat === "all" || categoryOf(p.market, p.selection) === cat);
+    for (const p of shown) {
       if (!byMatch.has(p.matchId)) byMatch.set(p.matchId, []);
       byMatch.get(p.matchId)!.push(p);
     }
@@ -34,8 +43,14 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
       if (!byDay.has(k)) byDay.set(k, { label: dayLabel(rows[0]!.kickoffUtc), matches: [] });
       byDay.get(k)!.matches.push(rows);
     }
+    // Inside a category, show the model's most confident games first.
+    if (cat !== "all") {
+      for (const d of byDay.values()) {
+        d.matches.sort((a, b) => Math.max(...b.map((p) => p.modelProb)) - Math.max(...a.map((p) => p.modelProb)));
+      }
+    }
     return [...byDay.entries()].sort(([a], [b]) => a.localeCompare(b));
-  }, [picks]);
+  }, [picks, cat]);
 
   const copy = async () => {
     if (!ticket || ticket.legs.length === 0) return;
@@ -100,9 +115,23 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
         )}
       </section>
 
+      {picks && picks.length > 0 && (
+        <div className="chips catpills" role="group" aria-label="Pick type of the day">
+          <button className="chip" aria-pressed={cat === "all"} onClick={() => setCat("all")}>All ({picks.length})</button>
+          {(Object.keys(CATEGORY_NAMES) as Category[]).map((c) => (
+            <button key={c} className="chip" aria-pressed={cat === c} onClick={() => setCat(c)} disabled={counts[c] === 0}>
+              {CATEGORY_NAMES[c]} ({counts[c]})
+            </button>
+          ))}
+        </div>
+      )}
+
       {!picks && !error && <p className="muted">Loading picks…</p>}
       {picks && picks.length === 0 && (
         <div className="empty"><p><strong>No top picks yet.</strong> Picks appear when the model is confident and has enough data.</p></div>
+      )}
+      {picks && picks.length > 0 && grouped.length === 0 && (
+        <div className="empty"><p><strong>No {cat !== "all" ? CATEGORY_NAMES[cat].toLowerCase() : "picks"} right now.</strong> The model is not confident enough on any game for this type.</p></div>
       )}
 
       {grouped.map(([key, day]) => (
@@ -123,6 +152,9 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
                         <span className="teamline"><Crest src={m.homeCrest} name={m.home} /><span>{m.home}</span></span>
                         <span className="teamline"><Crest src={m.awayCrest} name={m.away} /><span>{m.away}</span></span>
                       </span>
+                      {scoringOf(m.pOver25) && (
+                        <span className={"scoring s-" + scoringOf(m.pOver25)}>{SCORING_NAMES[scoringOf(m.pOver25)!]}</span>
+                      )}
                     </div>
                     {rows.map((p) => (
                       <div key={p.market + p.selection} className={`pickrow g-${pickGroup(p.market, p.selection)}`}>
