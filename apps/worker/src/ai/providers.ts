@@ -26,7 +26,10 @@ export const PROVIDERS: ProviderConfig[] = [
   { name: "gemini", baseUrl: GEMINI, model: "gemini-3.8-flash", keyEnv: "GEMINI_API_KEY", extra: GEMINI_EXTRA },
   // TODO: verify model names and free limits before relying on these two.
   { name: "groq", baseUrl: "https://api.groq.com/openai/v1", model: "llama-3.3-70b-versatile", keyEnv: "GROQ_API_KEY" },
-  { name: "openrouter", baseUrl: "https://openrouter.ai/api/v1", model: "meta-llama/llama-3.3-70b-instruct:free", keyEnv: "OPENROUTER_API_KEY" },
+  // OpenRouter free models (":free" models cost nothing). Checked 2026-11-23: ernie-5.5-flash answered JSON; some free models are often busy (429).
+  { name: "openrouter", baseUrl: "https://openrouter.ai/api/v1", model: "google/gemma-4-31b-it:free", keyEnv: "OPENROUTER_API_KEY" },
+  { name: "openrouter", baseUrl: "https://openrouter.ai/api/v1", model: "baidu/ernie-5.5-flash-preview:free", keyEnv: "OPENROUTER_API_KEY" },
+  { name: "openrouter", baseUrl: "https://openrouter.ai/api/v1", model: "nvidia/nemotron-3-ultra-550b-a55b:free", keyEnv: "OPENROUTER_API_KEY" },
 ];
 
 export class AiCallError extends Error {
@@ -61,7 +64,7 @@ export async function callProvider(
           ...(withJsonMode ? { response_format: { type: "json_object" } } : {}),
           ...(p.extra ?? {}),
         }),
-        signal: AbortSignal.timeout(25_000),
+        signal: AbortSignal.timeout(15_000), // a busy model is skipped quickly so the next one gets a turn
       });
     } catch (e) {
       throw new AiCallError("network", e instanceof Error ? e.name : "network error");

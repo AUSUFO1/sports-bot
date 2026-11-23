@@ -6,6 +6,7 @@ import { fetchFootballData } from "./jobs/fetchFootballData";
 import { settlePicks } from "./jobs/settlePicks";
 import { registerOddsRoutes } from "./routes/odds";
 import { analyseMatch, savedAnalysis } from "./ai/analyse";
+import { researchMatch, savedResearch } from "./ai/research";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -72,6 +73,16 @@ app.get("/api/games/:id/analysis", async (c) => {
 app.post("/api/games/:id/analyse", async (c) => {
   const r = await analyseMatch(c.env, c.req.param("id"));
   return r.ok ? c.json(r.value) : c.json({ error: r.message, attempts: r.attempts ?? [] }, r.status as 404 | 429 | 502 | 503);
+});
+
+// The AI's own web research for one game, compared with the model. Never changes the model's numbers.
+app.get("/api/games/:id/research", async (c) => {
+  const r = await savedResearch(c.env, c.req.param("id"));
+  return r.ok ? c.json(r.value) : c.json({ error: r.message }, r.status as 404);
+});
+app.post("/api/games/:id/research", async (c) => {
+  const r = await researchMatch(c.env, c.req.param("id"));
+  return r.ok ? c.json(r.value) : c.json({ error: r.message, attempts: r.attempts ?? [] }, r.status as 404 | 409 | 429 | 502 | 503);
 });
 
 // Upcoming games with the verdict badge and data freshness. Reads saved reports only (no maths here).

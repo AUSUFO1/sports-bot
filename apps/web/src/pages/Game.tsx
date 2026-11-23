@@ -4,6 +4,7 @@ import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, modelLean, pct, pic
 import { Footer } from "../components/Footer";
 import { Crest } from "../components/Crest";
 import { AiSection } from "../components/AiSection";
+import { ResearchSection } from "../components/ResearchSection";
 
 export function Game({ id, onUnauthorized }: { id: string; onUnauthorized: () => void }) {
   const [r, setR] = useState<Report | null>(null);
@@ -200,6 +201,7 @@ function Detail({ r, onUnauthorized }: { r: Report; onUnauthorized: () => void }
       )}
 
       <AiSection matchId={r.matchId} onUnauthorized={onUnauthorized} />
+      <ResearchSection matchId={r.matchId} onUnauthorized={onUnauthorized} />
     </>
   );
 }

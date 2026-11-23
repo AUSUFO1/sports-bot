@@ -327,3 +327,14 @@ tr.tap:hover td { background: var(--soft); }
 .verdict .big { font-size: 1.25rem; }
 
 .catpills { margin: 16px 0 4px; }
+
+/* AI's own research */
+.unverified { font-size: 0.78rem; color: var(--warn); background: var(--warn-bg); border-radius: 8px; padding: 6px 10px; margin: 12px 0 8px; }
+.agreebadge { font-weight: 700; color: var(--good); background: var(--good-bg); border-radius: 10px; padding: 8px 12px; }
+table.compare { margin: 8px 0 4px; }
+table.compare td:nth-child(n + 2), table.compare th:nth-child(n + 2) { text-align: left; }
+.cmpmark { white-space: nowrap; font-weight: 600; }
+.cmp-agree .cmpmark { color: var(--good); }
+.cmp-disagree .cmpmark { color: var(--bad); }
+.cmp-unclear .cmpmark { color: var(--muted); }
+.sources li { padding: 4px 0; font-size: 0.86rem; overflow-wrap: anywhere; }

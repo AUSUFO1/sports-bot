@@ -8,3 +8,4 @@ export * from "./targets";
 export * from "./settle";
 export * from "./ticket";
 export * from "./aiGuard";
+export * from "./research";

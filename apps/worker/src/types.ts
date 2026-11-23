@@ -9,6 +9,8 @@ export interface Env {
   GEMINI_API_KEY?: string;
   GROQ_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
+  /** web search for the AI research section (Tavily free plan) */
+  TAVILY_API_KEY?: string;
 }
 
 export interface LeagueInfo {
