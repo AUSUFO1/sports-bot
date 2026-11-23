@@ -1,6 +1,7 @@
 import { compareWithModel, parseModelJson, validateResearch, type Comparison, type ResearchView } from "@sports/stats";
 import type { Env } from "../types";
 import { AiCallError, availableProviders, callProvider } from "./providers";
+import { recordService } from "../health";
 
 /**
  * The AI's own research. Tavily searches the web for team news; the AI reads ONLY those results and gives its own view;
@@ -129,9 +130,11 @@ export async function researchMatch(env: Env, matchId: string): Promise<Research
     ]);
     const seen = new Set<string>();
     hits = [...a, ...b].filter((h) => (seen.has(h.url) ? false : (seen.add(h.url), true))).slice(0, MAX_SOURCES);
-  } catch {
+  } catch (e) {
+    await recordService(env, "research_search", false, e instanceof Error ? e.message : "search failed");
     return { ok: false, status: 502, message: "The web search did not answer. Try again in a minute." };
   }
+  await recordService(env, "research_search", true, `${hits.length} results`);
   if (hits.length === 0) return { ok: false, status: 404, message: "The web search found nothing recent about this game." };
 
   const list = hits.map((h, i) => `[${i + 1}] ${h.title}\n${h.url}\n${h.content}`).join("\n\n");
@@ -160,6 +163,7 @@ export async function researchMatch(env: Env, matchId: string): Promise<Research
       )
         .bind(matchId, cacheKey(day), p.name, JSON.stringify(stored), createdAt)
         .run();
+      await recordService(env, "research_ai", true, `${p.name} ${p.model} answered`, attempts);
       return {
         ok: true,
         value: { provider: p.name, model: p.model, cached: false, createdAt, view: checked.view, sources, comparison: compareWithModel(checked.view, leans), issues: checked.issues },
@@ -168,5 +172,6 @@ export async function researchMatch(env: Env, matchId: string): Promise<Research
       attempts.push(e instanceof AiCallError ? `${p.name} ${p.model}: ${e.kind}` : `${p.name} ${p.model}: failed`);
     }
   }
+  await recordService(env, "research_ai", false, attempts.length ? "every AI model failed" : "no AI key set", attempts);
   return { ok: false, status: 502, message: "No AI gave a usable research answer. Try again in a few minutes.", attempts };
 }

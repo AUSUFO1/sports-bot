@@ -338,3 +338,20 @@ table.compare td:nth-child(n + 2), table.compare th:nth-child(n + 2) { text-alig
 .cmp-disagree .cmpmark { color: var(--bad); }
 .cmp-unclear .cmpmark { color: var(--muted); }
 .sources li { padding: 4px 0; font-size: 0.86rem; overflow-wrap: anywhere; }
+
+/* Health page */
+.hrow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.hname { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.hrow .muted.small { flex-basis: 100%; padding-left: 20px; overflow-wrap: anywhere; }
+.hdot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--muted); }
+.hdot.ok { background: var(--good); }
+.hdot.bad { background: var(--bad); }
+.hfail { flex-basis: 100%; padding-left: 20px; }
+.hfail summary { cursor: pointer; color: var(--bad); font-size: 0.85rem; }
+.hfail ul { margin: 4px 0 0; padding-left: 18px; overflow-wrap: anywhere; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; text-decoration: underline; cursor: pointer; width: auto; }
+
+/* Token input with show/hide */
+.pwrow { display: flex; gap: 8px; align-items: stretch; }
+.pwrow input { flex: 1; min-width: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.pwtoggle { width: auto; flex: none; padding: 0 14px; background: transparent; color: var(--text, inherit); border: 1px solid var(--line); }

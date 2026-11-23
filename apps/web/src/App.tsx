@@ -5,6 +5,7 @@ import { Game } from "./pages/Game";
 import { Leagues } from "./pages/Leagues";
 import { Picks } from "./pages/Picks";
 import { History } from "./pages/History";
+import { Health } from "./pages/Health";
 import { Footer } from "./components/Footer";
 import { isDark, setTheme } from "./theme";
 import { BRAND_MARK, BRAND_NAME } from "./brand";
@@ -21,6 +22,7 @@ function useRoute(): string {
 
 function TokenScreen({ onSaved, message }: { onSaved: () => void; message?: string }) {
   const [value, setValue] = useState("");
+  const [show, setShow] = useState(false);
   return (
     <main className="page narrow">
       <span className="mark" aria-hidden>{BRAND_MARK}</span>
@@ -37,7 +39,21 @@ function TokenScreen({ onSaved, message }: { onSaved: () => void; message?: stri
         }}
       >
         <label htmlFor="token">Access token</label>
-        <input id="token" type="password" autoComplete="off" value={value} onChange={(e) => setValue(e.target.value)} />
+        <div className="pwrow">
+          <input
+            id="token"
+            type={show ? "text" : "password"}
+            autoComplete="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+          />
+          <button type="button" className="pwtoggle" aria-pressed={show} onClick={() => setShow(!show)}>
+            {show ? "Hide" : "Show"}
+          </button>
+        </div>
+        {value && value !== value.trim() && <p className="muted small">Spaces at the start or end will be removed.</p>}
         <button type="submit">Continue</button>
       </form>
       <Footer />
@@ -78,13 +94,15 @@ export function App() {
           <a href="#/" aria-current={route === "#/" || route === "" ? "page" : undefined}>Picks</a>
           <a href="#/games" aria-current={route === "#/games" ? "page" : undefined}>Games</a>
           <a href="#/history" aria-current={route === "#/history" ? "page" : undefined}>History</a>
-          <a href="#/leagues" aria-current={route === "#/leagues" ? "page" : undefined}>More</a>
+          <a href="#/leagues" aria-current={route === "#/leagues" || route === "#/health" ? "page" : undefined}>More</a>
         </nav>
       </header>
       {gameMatch ? (
         <Game id={decodeURIComponent(gameMatch[1]!)} onUnauthorized={bad} />
       ) : route === "#/leagues" ? (
         <Leagues onUnauthorized={bad} onSignOut={() => logout()} />
+      ) : route === "#/health" ? (
+        <Health onUnauthorized={bad} />
       ) : route === "#/games" ? (
         <Games onUnauthorized={bad} />
       ) : route === "#/history" ? (

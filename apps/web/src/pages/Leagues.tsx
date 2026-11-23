@@ -24,6 +24,8 @@ export function Leagues({ onUnauthorized, onSignOut }: { onUnauthorized: () => v
   return (
     <main className="page">
       <h1>More</h1>
+      <h2>System</h2>
+      <p><a href="#/health">Health: what works and what failed →</a></p>
       <h2>Appearance</h2>
       <div className="seg" role="group" aria-label="Colour mode">
         {(["system", "light", "dark"] as const).map((t) => (

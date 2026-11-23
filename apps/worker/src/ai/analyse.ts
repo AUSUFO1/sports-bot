@@ -1,6 +1,7 @@
 import { parseModelJson, validateAnalysis, verdictLineFor, type Analysis, type HistorySummary, type ReportLike } from "@sports/stats";
 import type { Env } from "../types";
 import { AiCallError, availableProviders, callProvider } from "./providers";
+import { recordService } from "../health";
 import { SYSTEM_PROMPT, userPrompt } from "./prompts";
 
 /** Calls to AI providers per UTC day. Free-tier limits are not published per model, so stay conservative. */
@@ -116,10 +117,12 @@ export async function analyseMatch(env: Env, matchId: string): Promise<AnalyseRe
       )
         .bind(matchId, report.hash, p.name, JSON.stringify(stored), createdAt)
         .run();
+      await recordService(env, "analysis_ai", true, `${p.name} ${p.model} answered`, attempts);
       return { ok: true, value: { provider: p.name, model: p.model, cached: false, createdAt, verdictLine: guard.verdictLine, analysis: guard.analysis, issues: guard.issues, numberMismatches: guard.numberMismatches } };
     } catch (e) {
       attempts.push(e instanceof AiCallError ? `${p.name} ${p.model}: ${e.kind}` : `${p.name} ${p.model}: failed`); // fall back to the next provider
     }
   }
+  await recordService(env, "analysis_ai", false, "every AI model failed", attempts);
   return { ok: false, status: 502, message: "No AI provider gave a usable answer. The numbers above are still correct.", attempts };
 }

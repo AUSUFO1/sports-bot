@@ -7,6 +7,7 @@ import { settlePicks } from "./jobs/settlePicks";
 import { registerOddsRoutes } from "./routes/odds";
 import { analyseMatch, savedAnalysis } from "./ai/analyse";
 import { researchMatch, savedResearch } from "./ai/research";
+import { healthDetails } from "./health";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -56,14 +57,8 @@ app.get("/api/leagues", async (c) => {
   );
 });
 
-app.get("/api/health/details", async (c) => {
-  const fetchRun = await c.env.KV.get("lastRun:fetchFootballData");
-  const reportRun = await c.env.KV.get("lastRun:buildReports");
-  return c.json({
-    lastFetchRun: fetchRun ? JSON.parse(fetchRun) : null,
-    lastReportRun: reportRun ? JSON.parse(reportRun) : null,
-  });
-});
+// What last ran, whether it worked and why not. Key NAMES with set/not set only, never values.
+app.get("/api/health/details", async (c) => c.json(await healthDetails(c.env)));
 
 // AI analysis. Reads the saved report only; the AI explains numbers the backend already produced.
 app.get("/api/games/:id/analysis", async (c) => {
