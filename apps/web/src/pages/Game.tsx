@@ -106,10 +106,16 @@ function Detail({ r, onUnauthorized }: { r: Report; onUnauthorized: () => void }
               Expected goals {r.model.expectedGoals.home.toFixed(2)} – {r.model.expectedGoals.away.toFixed(2)} · based on{" "}
               {r.sample.homeMatches} and {r.sample.awayMatches} recent matches
             </p>
+            {r.model.tuning && r.model.tuning.modelWeight < 1 && (
+              <p className="muted small">
+                The picks use Pinnacle's price where it has one: in a test on 3,654 past games it predicted better than our
+                model. Our model is shown as a second opinion and is used where Pinnacle has no price.
+              </p>
+            )}
             {markets.map((m) => (
               <div key={m} className="market">
                 <h3>{MARKET_NAMES[m] ?? m}</h3>
-                {Object.entries(r.model!.probabilities[m]!).map(([sel, p]) => {
+                {Object.entries(r.model!.rawProbabilities?.[m] ?? r.model!.probabilities[m]!).map(([sel, p]) => {
                   const fair = r.market.fairProbabilities[m]?.[sel];
                   return (
                     <div key={sel} className="bars">

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "backtest": "node node_modules/.pnpm/vite-node@2.1.9/node_modules/vite-node/vite-node.mjs scripts/backtest.ts",
     "typecheck": "tsc -b --noEmit || tsc -p packages/stats --noEmit && tsc -p apps/worker --noEmit"
   },
   "devDependencies": {

@@ -1,0 +1,29 @@
+{
+  "ranAt": "2026-11-23",
+  "leagues": [
+    "E0",
+    "F1",
+    "SP1",
+    "D1",
+    "I1"
+  ],
+  "matchesScored": 3654,
+  "from": "2023-12-09",
+  "to": "2026-01-15",
+  "best": {
+    "rho": 0,
+    "modelWeight": 0
+  },
+  "logLoss": {
+    "market": 1.639,
+    "modelOnly": 1.727,
+    "blended": 1.639
+  },
+  "picks": {
+    "bets": 0,
+    "wins": 0,
+    "roi": null
+  },
+  "valueRoiModelOnly": -0.0753,
+  "valueBetsModelOnly": 2929
+}

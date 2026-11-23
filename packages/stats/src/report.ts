@@ -16,7 +16,22 @@ import {
   type ValueRow,
 } from "./picks";
 
-export const MODEL_VERSION = "poisson-v1";
+export const MODEL_VERSION = "poisson-dc-v2";
+
+/** Model settings chosen by the backtest (scripts/backtest.mjs), never by feel. */
+export interface ModelTuning {
+  /** Dixon-Coles low-score correction; 0 = plain Poisson */
+  rho: number;
+  /**
+   * Share of the final probability that comes from our model; the rest is Pinnacle's fair price.
+   * 1 = model only. Used only where Pinnacle prices the whole market.
+   */
+  modelWeight: number;
+}
+
+// Backtest 2026-11-23 (3,654 games, 5 leagues, 2023-26): Pinnacle alone had the lowest log loss; every share of the
+// model made it worse, and value picks lost about 10% per bet. So Pinnacle leads; rho only shapes the model fallback.
+export const DEFAULT_TUNING: ModelTuning = { rho: -0.15, modelWeight: 0 };
 /** The sharp bookmaker whose prices define the "fair" market probability. */
 export const REFERENCE_BOOK = "pinnacle";
 
@@ -42,6 +57,7 @@ export interface ReportInput {
   /** "now", ISO string; passed in so the function stays pure */
   now: string;
   config?: PickConfig;
+  tuning?: ModelTuning;
 }
 
 const MARKETS: Record<string, string[]> = {
@@ -65,7 +81,12 @@ export interface Report {
   model: {
     version: string;
     expectedGoals: { home: number; away: number };
+    /** final probabilities: the model blended with Pinnacle's fair price where Pinnacle priced the market */
     probabilities: Record<string, Probs>;
+    /** the model on its own, before the blend */
+    rawProbabilities?: Record<string, Probs>;
+    /** how the final numbers were made; absent on reports from before this was added */
+    tuning?: ModelTuning & { blendedMarkets: string[] };
     topScorelines: { score: string; prob: number }[];
     eloCheck: { home: number; draw: number; away: number; agrees: boolean };
   } | null;
@@ -93,6 +114,7 @@ const HOUR = 3_600_000;
 /** Builds the section 8 report. Pure: same input, same output. Never fills a gap with a guess. */
 export function buildReport(input: ReportInput): Report {
   const cfg = input.config ?? DEFAULT_PICK_CONFIG;
+  const tuning = input.tuning ?? DEFAULT_TUNING;
   const now = Date.parse(input.now);
   const warnings: string[] = [];
   const emptyMarket = { bestOdds: {}, fairProbabilities: {}, marginByMarket: {}, byBook: {} };
@@ -127,7 +149,7 @@ export function buildReport(input: ReportInput): Report {
   }
 
   // Model probabilities from the Poisson score matrix.
-  const matrix = scoreMatrix(lam.lambdaHome, lam.lambdaAway);
+  const matrix = scoreMatrix(lam.lambdaHome, lam.lambdaAway, 10, tuning.rho);
   const probabilities: Record<string, Probs> = {
     "1x2": { ...oneXTwo(matrix) },
     ou_1_5: { ...overUnder(matrix, 1.5) },
@@ -148,6 +170,10 @@ export function buildReport(input: ReportInput): Report {
   if (Math.min(lam.homeMatches, lam.awayMatches) < cfg.minMatches) {
     warnings.push(`Low sample: ${lam.homeMatches} home-side and ${lam.awayMatches} away-side matches (need ${cfg.minMatches})`);
   }
+
+  // Keep the model's own numbers before any blending (deep copy).
+  const raw: Record<string, Probs> = Object.fromEntries(Object.entries(probabilities).map(([k, v]) => [k, { ...v }]));
+  const blendedMarkets: string[] = [];
 
   // Market side: best odds per selection, margin removed per market.
   const bestOdds: Record<string, Probs> = {};
@@ -186,6 +212,12 @@ export function buildReport(input: ReportInput): Report {
     fair[market] = Object.fromEntries(selections.map((s, i) => [s, f[i]!]));
     margins[market] = margin;
     if (!useRef && books[market]!.size === 1) warnings.push(`Only 1 bookmaker priced ${market}`);
+    // Blend with the sharp price. Only Pinnacle is trusted for this; a soft book's price is not a good anchor.
+    if (useRef && tuning.modelWeight < 1) {
+      const w = Math.max(0, Math.min(1, tuning.modelWeight));
+      for (const s of selections) probabilities[market]![s] = w * raw[market]![s]! + (1 - w) * fair[market]![s]!;
+      blendedMarkets.push(market);
+    }
     for (const s of selections) {
       candidates.push({ market, selection: s, modelProb: probabilities[market]![s]!, fairProb: fair[market]![s]!, odds: priced[s]! });
     }
@@ -227,6 +259,8 @@ export function buildReport(input: ReportInput): Report {
       version: MODEL_VERSION,
       expectedGoals: { home: lam.lambdaHome, away: lam.lambdaAway },
       probabilities,
+      rawProbabilities: raw,
+      tuning: { ...tuning, blendedMarkets },
       topScorelines: topScorelines(matrix, 5),
       eloCheck: { ...elo, agrees },
     },

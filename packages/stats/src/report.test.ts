@@ -22,6 +22,8 @@ const input = (over: Partial<ReportInput> = {}): ReportInput => ({
   odds: [],
   fixturesFetchedAt: "2026-12-05T08:00:00Z",
   now: NOW,
+  // The hand-checked numbers below are for plain Poisson with no market blend; the blend has its own tests.
+  tuning: { rho: 0, modelWeight: 1 },
   ...over,
 });
 const odd = (selection: string, decimalOdds: number, capturedAt = "2026-12-05T09:30:00Z", market = "1x2", bookmaker = "bk1"): OddsInput => ({
@@ -35,7 +37,7 @@ const odd = (selection: string, decimalOdds: number, capturedAt = "2026-12-05T09
 describe("report without odds (the honest default)", () => {
   const r = buildReport(input());
   it("has the section 8 shape and the hand-checked model numbers", () => {
-    expect(r.model!.version).toBe("poisson-v1");
+    expect(r.model!.version).toBe("poisson-dc-v2");
     expect(r.model!.expectedGoals.home).toBeCloseTo(1, 9);
     expect(r.model!.expectedGoals.away).toBeCloseTo(1, 9);
     expect(r.model!.probabilities["1x2"]!.draw).toBeCloseTo(0.308509, 5);
@@ -184,5 +186,33 @@ describe("reference book (Pinnacle) and per-bookmaker odds", () => {
     const part = buildReport(input({ odds: [odd("home", 3.4, undefined, "1x2", "pinnacle"), odd("home", 3.0), odd("draw", 2.6), odd("away", 2.6)] }));
     expect(part.market.bestOdds["1x2"]!.home).toBe(3.4); // best across books (3.4 beats 3.0), computed from the full set
     expect(part.market.byBook.pinnacle!["1x2"]!.draw).toBeUndefined();
+  });
+});
+
+describe("Dixon-Coles and market blend", () => {
+  const pin = (sel: string, o: number) => odd(sel, o, undefined, "1x2", "pinnacle");
+  const pinOdds = [pin("home", 3.0), pin("draw", 3.0), pin("away", 3.0)]; // fair 1/3 each, no margin
+
+  it("rho < 0 puts more weight on draws than plain Poisson", () => {
+    const plain = buildReport(input()).model!.probabilities["1x2"]!.draw!;
+    const dc = buildReport(input({ tuning: { rho: -0.1, modelWeight: 1 } })).model!.probabilities["1x2"]!.draw!;
+    expect(dc).toBeGreaterThan(plain);
+  });
+
+  it("blends model and Pinnacle by the model weight, and keeps the raw model", () => {
+    const r = buildReport(input({ odds: pinOdds, tuning: { rho: 0, modelWeight: 0.5 } }));
+    const raw = r.model!.rawProbabilities!["1x2"]!;
+    const p = r.model!.probabilities["1x2"]!;
+    for (const s of ["home", "draw", "away"]) expect(p[s]).toBeCloseTo(0.5 * raw[s]! + 0.5 / 3, 9);
+    expect(r.model!.tuning!.blendedMarkets).toEqual(["1x2"]);
+    // edge against the fair price is halved
+    const v = r.value.find((x) => x.selection === "draw")!;
+    expect(v.edge).toBeCloseTo(0.5 * (raw.draw! - 1 / 3), 9);
+  });
+
+  it("does not blend with a soft bookmaker's price", () => {
+    const r = buildReport(input({ odds: [odd("home", 3.0), odd("draw", 3.0), odd("away", 3.0)], tuning: { rho: 0, modelWeight: 0.5 } }));
+    expect(r.model!.tuning!.blendedMarkets).toEqual([]);
+    expect(r.model!.probabilities["1x2"]).toEqual(r.model!.rawProbabilities!["1x2"]);
   });
 });

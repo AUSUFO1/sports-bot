@@ -55,6 +55,22 @@ export async function fetchFootballData(env: Env, now = new Date(), maxLeagues =
         const last = Number((await env.KV.get(`fd:fetched:${league.id}`)) ?? 0);
         if (!needCrests && now.getTime() - last < LEAGUE_REFRESH_MS) continue; // cached, nothing to refetch
         const ids = JSON.parse(league.provider_ids);
+        // Last season, once per league (one call). Older games count less in the model on their own (weight halves
+        // every 60 days), so this steadies early-season numbers and gives the backtest finished games to score.
+        if (league.n > 0 && !(await env.KV.get(`fd:prev:${league.id}`))) {
+          try {
+            const prev = await provider.getFixtures(String(ids.footballData), Number(ids.season) - 1, "", "");
+            await upsertFixtures(env.DB, league.id, prev.filter((f) => f.status === "finished"), now.toISOString(), FOOTBALL_DATA);
+            await env.KV.put(`fd:prev:${league.id}`, String(prev.length));
+            log[`${league.id}:lastSeason`] = `${prev.length} matches`;
+          } catch (e) {
+            // A plan refusal will not change: remember it so it is not retried every hour.
+            if (e instanceof ProviderError && e.kind === "plan") await env.KV.put(`fd:prev:${league.id}`, "refused");
+            throw e;
+          }
+          done++;
+          continue;
+        }
         const full = league.n === 0 || needCrests;
         if (needCrests) await env.KV.put(`fd:crestfull:${league.id}`, String(now.getTime()));
         const from = full ? "" : day(new Date(now.getTime() - PAST_DAYS * 86400_000));

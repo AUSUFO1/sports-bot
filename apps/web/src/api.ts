@@ -174,6 +174,9 @@ export interface Report {
     version: string;
     expectedGoals: { home: number; away: number };
     probabilities: Record<string, Probs>;
+    /** our model on its own (newer reports only) */
+    rawProbabilities?: Record<string, Probs>;
+    tuning?: { rho: number; modelWeight: number; blendedMarkets: string[] };
     topScorelines: { score: string; prob: number }[];
     eloCheck: { home: number; draw: number; away: number; agrees: boolean };
   } | null;

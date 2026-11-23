@@ -27,11 +27,23 @@ export function poissonPmf(k: number, lambda: number): number {
   return p;
 }
 
+/**
+ * Dixon-Coles adjustment for the four low scores. Plain Poisson treats both teams' goals as independent,
+ * which gets 0-0, 1-0, 0-1 and 1-1 slightly wrong. rho < 0 adds draws at 0-0 and 1-1. rho = 0 is plain Poisson.
+ */
+export function dixonColesTau(h: number, a: number, lambdaHome: number, lambdaAway: number, rho: number): number {
+  if (h === 0 && a === 0) return 1 - lambdaHome * lambdaAway * rho;
+  if (h === 0 && a === 1) return 1 + lambdaHome * rho;
+  if (h === 1 && a === 0) return 1 + lambdaAway * rho;
+  if (h === 1 && a === 1) return 1 - rho;
+  return 1;
+}
+
 /** matrix[h][a] = P(home scores h, away scores a), truncated at maxGoals and renormalised to 1. */
-export function scoreMatrix(lambdaHome: number, lambdaAway: number, maxGoals = 10): number[][] {
+export function scoreMatrix(lambdaHome: number, lambdaAway: number, maxGoals = 10, rho = 0): number[][] {
   const ph = Array.from({ length: maxGoals + 1 }, (_, k) => poissonPmf(k, lambdaHome));
   const pa = Array.from({ length: maxGoals + 1 }, (_, k) => poissonPmf(k, lambdaAway));
-  const m = ph.map((x) => pa.map((y) => x * y));
+  const m = ph.map((x, h) => pa.map((y, a) => Math.max(0, x * y * dixonColesTau(h, a, lambdaHome, lambdaAway, rho))));
   const total = m.flat().reduce((s, v) => s + v, 0);
   return m.map((row) => row.map((v) => v / total));
 }

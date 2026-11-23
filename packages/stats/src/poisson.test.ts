@@ -97,3 +97,17 @@ describe("computeLambdas", () => {
     expect(computeLambdas([], "A", "B", day(10))).toBeNull();
   });
 });
+
+describe("Dixon-Coles score matrix", () => {
+  it("rho = 0 is plain Poisson", () => {
+    expect(scoreMatrix(1.4, 1.1, 10, 0)).toEqual(scoreMatrix(1.4, 1.1));
+  });
+  it("still sums to 1 and raises 0-0 and 1-1 when rho < 0", () => {
+    const plain = scoreMatrix(1.4, 1.1);
+    const dc = scoreMatrix(1.4, 1.1, 10, -0.1);
+    expect(dc.flat().reduce((s, v) => s + v, 0)).toBeCloseTo(1, 12);
+    expect(dc[0]![0]!).toBeGreaterThan(plain[0]![0]!);
+    expect(dc[1]![1]!).toBeGreaterThan(plain[1]![1]!);
+    expect(dc[1]![0]!).toBeLessThan(plain[1]![0]!);
+  });
+});

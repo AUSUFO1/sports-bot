@@ -80,7 +80,10 @@ export function Games({ onUnauthorized }: { onUnauthorized: () => void }) {
               <li key={g.id}>
                 <a href={`#/game/${encodeURIComponent(g.id)}`} className="game">
                   <div className="gtop">
-                    <span>{g.leagueName.replace(/\s*\(.*\)$/, "")} · {time(g.kickoffUtc)}</span>
+                    <span>
+                      {g.leagueName.replace(/\s*\(.*\)$/, "")} · {time(g.kickoffUtc)}
+                      {(g.status === "live" || Date.parse(g.kickoffUtc) <= Date.now()) && <span className="badge started">STARTED</span>}
+                    </span>
                     <span
                       className={`dot ${freshness(g.fixturesFetchedAt)}`}
                       title={`Fixture data fetched ${ageText(g.fixturesFetchedAt)}`}
