@@ -2,10 +2,12 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type LeagueRow } from "../api";
 import { ageText } from "../format";
 import { Footer } from "../components/Footer";
+import { getTheme, setTheme, type Theme } from "../theme";
 
-export function Leagues({ onUnauthorized }: { onUnauthorized: () => void }) {
+export function Leagues({ onUnauthorized, onSignOut }: { onUnauthorized: () => void; onSignOut: () => void }) {
   const [rows, setRows] = useState<LeagueRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [theme, setThemeState] = useState<Theme>(getTheme());
 
   useEffect(() => {
     api<LeagueRow[]>("/api/leagues")
@@ -21,7 +23,16 @@ export function Leagues({ onUnauthorized }: { onUnauthorized: () => void }) {
 
   return (
     <main className="page">
-      <h1>Leagues</h1>
+      <h1>More</h1>
+      <h2>Appearance</h2>
+      <div className="seg" role="group" aria-label="Colour mode">
+        {(["system", "light", "dark"] as const).map((t) => (
+          <button key={t} aria-pressed={theme === t} onClick={() => { setTheme(t); setThemeState(t); }}>
+            {t === "system" ? "Device" : t === "light" ? "Light" : "Dark"}
+          </button>
+        ))}
+      </div>
+      <h2>Leagues</h2>
       {error && <p className="error" role="alert">{error}</p>}
       {!rows && !error && <p className="muted">Loading leagues…</p>}
       {rows && (
@@ -47,6 +58,7 @@ export function Leagues({ onUnauthorized }: { onUnauthorized: () => void }) {
           </ul>
         </>
       )}
+      <button className="secondary" style={{ marginTop: 24 }} onClick={onSignOut}>Sign out</button>
       <Footer />
     </main>
   );

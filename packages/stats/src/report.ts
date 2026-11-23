@@ -1,4 +1,5 @@
 import { removeMargin } from "./odds";
+import { topPicks, type TopPick } from "./targets";
 import { buildEloRatings, eloExpected, eloOneXTwo, ELO_START } from "./elo";
 import { btts, oneXTwo, overUnder, topScorelines } from "./markets";
 import { computeLambdas, scoreMatrix, type PastMatch } from "./poisson";
@@ -74,6 +75,10 @@ export interface Report {
   shortlist: { market: string; selection: string; odds: number; ev: number; confidence: "LOW" | "MEDIUM" | "HIGH" }[];
   verdict: "BET_CANDIDATE" | "NO_BET";
   confidence: "LOW" | "MEDIUM" | "HIGH";
+  /** the model's most likely scoreline, kept so the tracker can compare it to the final score */
+  predictedScore: string | null;
+  /** top picks: the selections the model is confident enough to shortlist (see targets.ts) */
+  picks: TopPick[];
   warnings: string[];
 }
 
@@ -109,6 +114,8 @@ export function buildReport(input: ReportInput): Report {
       shortlist: [],
       verdict: "NO_BET",
       confidence: "LOW",
+      predictedScore: null,
+      picks: [],
       warnings,
     };
   }
@@ -178,6 +185,19 @@ export function buildReport(input: ReportInput): Report {
   const value: ValueRow[] = valueRows(candidates);
   const ctx = { homeMatches: lam.homeMatches, awayMatches: lam.awayMatches, oddsAgeHours, modelGap };
   const list = hasOdds ? shortlist(value, ctx, cfg) : [];
+  const picks = topPicks(
+    {
+      probabilities,
+      expectedGoals: { home: lam.lambdaHome, away: lam.lambdaAway },
+      homeMatches: lam.homeMatches,
+      awayMatches: lam.awayMatches,
+      modelsAgree: agrees,
+      value,
+      shortlisted: list,
+    },
+    undefined,
+    cfg,
+  );
 
   return {
     ...base,
@@ -203,6 +223,8 @@ export function buildReport(input: ReportInput): Report {
     shortlist: list,
     verdict: verdictOf(list),
     confidence: confidenceOf(ctx, cfg),
+    predictedScore: topScorelines(matrix, 1)[0]?.score ?? null,
+    picks,
     warnings,
   };
 }

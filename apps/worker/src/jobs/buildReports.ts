@@ -33,7 +33,7 @@ export async function buildReports(env: Env, now = new Date(), cap = DEFAULT_CAP
     .all<Upcoming>();
 
   const histories = new Map<string, PastMatch[]>(); // one history query per league per run
-  const results = { built: 0, bet_candidates: 0, no_bet: 0, failed: 0 };
+  const results = { built: 0, bet_candidates: 0, no_bet: 0, failed: 0, picks_logged: 0 };
 
   for (const m of todo.results) {
     try {
@@ -86,6 +86,25 @@ export async function buildReports(env: Env, now = new Date(), cap = DEFAULT_CAP
       )
         .bind(m.id, JSON.stringify(report), MODEL_VERSION, JSON.stringify(report.dataFreshness), now.toISOString())
         .run();
+
+      // Log each top pick once, before kickoff. INSERT OR IGNORE keeps the first pick forever (no hindsight edits).
+      if (report.picks.length > 0) {
+        const ins = env.DB.prepare(
+          `INSERT OR IGNORE INTO picks_log
+             (match_id, market, selection, model_prob, odds_taken, result, created_at,
+              league_id, kickoff_utc, kind, confidence, ev, pred_score)
+           VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+        );
+        await env.DB.batch(
+          report.picks.map((p) =>
+            ins.bind(
+              m.id, p.market, p.selection, p.modelProb, p.odds ?? 0, now.toISOString(),
+              m.league_id, m.kickoff_utc, p.kind, report.confidence, p.ev, report.predictedScore,
+            ),
+          ),
+        );
+        results.picks_logged += report.picks.length;
+      }
 
       results.built++;
       if (report.verdict === "BET_CANDIDATE") results.bet_candidates++;

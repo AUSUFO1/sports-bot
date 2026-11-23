@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { buildTicket, type TicketCandidate } from "@sports/stats";
 import { buildReports } from "./jobs/buildReports";
 import { fetchFootballData } from "./jobs/fetchFootballData";
+import { settlePicks } from "./jobs/settlePicks";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -63,7 +65,7 @@ app.get("/api/games", async (c) => {
   const to = date ? `${date}T23:59:59.999Z` : new Date(Date.now() + 7 * 86400_000).toISOString();
   const rows = await c.env.DB.prepare(
     `SELECT m.id, m.league_id AS leagueId, l.name AS leagueName, m.kickoff_utc AS kickoffUtc, m.status,
-            ht.name AS home, at2.name AS away, m.fetched_at AS fixturesFetchedAt,
+            ht.name AS home, at2.name AS away, ht.crest AS homeCrest, at2.crest AS awayCrest, m.fetched_at AS fixturesFetchedAt,
             r.match_id IS NOT NULL AS hasReport,
             json_extract(r.report_json, '$.verdict') AS verdict,
             json_extract(r.report_json, '$.confidence') AS confidence,
@@ -88,12 +90,86 @@ app.get("/api/games", async (c) => {
 
 // Full saved report for one match (read only: no maths happens in a request).
 app.get("/api/games/:id", async (c) => {
-  const row = await c.env.DB.prepare(`SELECT report_json FROM reports WHERE match_id = ?1`)
+  const row = await c.env.DB.prepare(
+    `SELECT r.report_json, ht.crest AS homeCrest, at2.crest AS awayCrest
+     FROM reports r JOIN matches m ON m.id = r.match_id
+     JOIN teams ht ON ht.id = m.home_team_id JOIN teams at2 ON at2.id = m.away_team_id
+     WHERE r.match_id = ?1`,
+  )
     .bind(c.req.param("id"))
-    .first<{ report_json: string }>();
+    .first<{ report_json: string; homeCrest: string | null; awayCrest: string | null }>();
   if (!row) return c.json({ error: "no report for this match yet" }, 404);
-  return c.json(JSON.parse(row.report_json));
+  return c.json({ ...JSON.parse(row.report_json), homeCrest: row.homeCrest, awayCrest: row.awayCrest });
 });
+
+// Top picks for upcoming games, read straight out of the saved reports (no maths in a request).
+async function upcomingPicks(env: Env) {
+  const rows = await env.DB.prepare(
+    `SELECT m.id AS matchId, l.name AS leagueName, m.kickoff_utc AS kickoffUtc, ht.name AS home, at2.name AS away,
+            ht.crest AS homeCrest, at2.crest AS awayCrest,
+            json_extract(r.report_json, '$.predictedScore') AS predictedScore,
+            json_extract(r.report_json, '$.confidence') AS confidence,
+            json_extract(p.value, '$.market') AS market, json_extract(p.value, '$.selection') AS selection,
+            json_extract(p.value, '$.modelProb') AS modelProb, json_extract(p.value, '$.strength') AS strength,
+            json_extract(p.value, '$.kind') AS kind, json_extract(p.value, '$.odds') AS odds,
+            json_extract(p.value, '$.ev') AS ev, json_extract(p.value, '$.ticketOk') AS ticketOk,
+            json_extract(p.value, '$.flags') AS flags
+     FROM reports r
+     JOIN matches m ON m.id = r.match_id
+     JOIN leagues l ON l.id = m.league_id
+     JOIN teams ht ON ht.id = m.home_team_id
+     JOIN teams at2 ON at2.id = m.away_team_id
+     JOIN json_each(r.report_json, '$.picks') p
+     WHERE m.status = 'scheduled' AND m.kickoff_utc > ?1
+     ORDER BY m.kickoff_utc, json_extract(p.value, '$.strength') DESC LIMIT 200`,
+  )
+    .bind(new Date().toISOString())
+    .all<Record<string, unknown>>();
+  return rows.results.map((r) => ({
+    ...r,
+    ticketOk: r.ticketOk === 1 || r.ticketOk === true,
+    flags: typeof r.flags === "string" ? JSON.parse(r.flags) : [],
+  }));
+}
+
+app.get("/api/picks", async (c) => c.json(await upcomingPicks(c.env)));
+
+// Accumulator built from the safest top picks. The user places it by hand.
+app.get("/api/ticket", async (c) => {
+  const legs = Math.min(Math.max(Number(c.req.query("legs") ?? 4) || 4, 1), 8);
+  const picks = await upcomingPicks(c.env);
+  const ticket = buildTicket(picks as unknown as TicketCandidate[], legs);
+  return c.json(ticket ?? { legs: [], combinedProb: 0, combinedOdds: null, ev: null });
+});
+
+// History of every logged pick, with record totals. Settled picks show the final score.
+app.get("/api/history", async (c) => {
+  const list = await c.env.DB.prepare(
+    `SELECT p.id, p.match_id AS matchId, l.name AS leagueName, p.kickoff_utc AS kickoffUtc,
+            ht.name AS home, at2.name AS away, ht.crest AS homeCrest, at2.crest AS awayCrest,
+            p.market, p.selection, p.model_prob AS modelProb,
+            CASE WHEN p.odds_taken > 0 THEN p.odds_taken END AS odds, p.ev, p.kind, p.confidence,
+            p.pred_score AS predictedScore, p.final_score AS finalScore, p.result
+     FROM picks_log p
+     JOIN matches m ON m.id = p.match_id
+     JOIN leagues l ON l.id = m.league_id
+     JOIN teams ht ON ht.id = m.home_team_id
+     JOIN teams at2 ON at2.id = m.away_team_id
+     ORDER BY p.kickoff_utc DESC LIMIT 300`,
+  ).all();
+  const byMarket = await c.env.DB.prepare(
+    `SELECT market, selection, SUM(result = 'win') AS wins, SUM(result = 'loss') AS losses
+     FROM picks_log WHERE result IN ('win', 'loss') GROUP BY market, selection ORDER BY market, selection`,
+  ).all();
+  const byBucket = await c.env.DB.prepare(
+    `SELECT CAST(model_prob * 10 AS INTEGER) * 10 AS bucket, SUM(result = 'win') AS wins, SUM(result = 'loss') AS losses
+     FROM picks_log WHERE result IN ('win', 'loss') GROUP BY bucket ORDER BY bucket`,
+  ).all();
+  const open = await c.env.DB.prepare(`SELECT COUNT(*) AS n FROM picks_log WHERE result IS NULL`).first<{ n: number }>();
+  return c.json({ picks: list.results, byMarket: byMarket.results, byBucket: byBucket.results, open: open?.n ?? 0 });
+});
+
+app.post("/api/jobs/settle", async (c) => c.json(await settlePicks(c.env)));
 
 // Manual trigger for the owner (same job as the cron). ?max=1 keeps a test run tiny.
 app.post("/api/jobs/fetch", async (c) => {
@@ -109,7 +185,11 @@ app.post("/api/jobs/reports", async (c) => {
 export default {
   fetch: app.fetch,
   async scheduled(_e: ScheduledController, env: Env, ctx: ExecutionContext) {
-    // Fetch first, then build reports from what is now stored.
-    ctx.waitUntil(fetchFootballData(env).then(() => buildReports(env)));
+    // Fetch first, then build reports and log picks, then settle finished games.
+    ctx.waitUntil(
+      fetchFootballData(env)
+        .then(() => buildReports(env))
+        .then(() => settlePicks(env)),
+    );
   },
 };

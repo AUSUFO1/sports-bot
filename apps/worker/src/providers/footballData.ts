@@ -33,10 +33,11 @@ export function parseMatches(body: Json, leagueCode: string): Fixture[] {
       season: Number(String(m.season?.startDate ?? "").slice(0, 4)) || 0,
       kickoffUtc: new Date(m.utcDate).toISOString(),
       status: mapStatus(String(m.status ?? "SCHEDULED")),
-      home: { providerId: String(m.homeTeam.id), name: String(m.homeTeam.name ?? m.homeTeam.shortName) },
-      away: { providerId: String(m.awayTeam.id), name: String(m.awayTeam.name ?? m.awayTeam.shortName) },
-      homeGoals: m.score?.fullTime?.home ?? null,
-      awayGoals: m.score?.fullTime?.away ?? null,
+      home: { providerId: String(m.homeTeam.id), name: String(m.homeTeam.name ?? m.homeTeam.shortName), crest: m.homeTeam.crest ?? null },
+      away: { providerId: String(m.awayTeam.id), name: String(m.awayTeam.name ?? m.awayTeam.shortName), crest: m.awayTeam.crest ?? null },
+      // Picks settle on the 90-minute result. If the match went to extra time, regularTime holds that score.
+      homeGoals: (m.score?.regularTime ?? m.score?.fullTime)?.home ?? null,
+      awayGoals: (m.score?.regularTime ?? m.score?.fullTime)?.away ?? null,
     });
   }
   return out;

@@ -45,6 +45,8 @@ export interface Game {
   status: string;
   home: string;
   away: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
   fixturesFetchedAt: string | null;
   hasReport: boolean;
   verdict: "BET_CANDIDATE" | "NO_BET" | null;
@@ -64,6 +66,59 @@ export interface LeagueRow {
   dataStatus: "ready" | "not_filled";
 }
 
+export interface PickRow {
+  matchId: string;
+  leagueName: string;
+  kickoffUtc: string;
+  home: string;
+  away: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
+  predictedScore: string | null;
+  confidence: string | null;
+  market: string;
+  selection: string;
+  modelProb: number;
+  kind: "value" | "model";
+  odds: number | null;
+  ev: number | null;
+  ticketOk: boolean;
+  flags: string[];
+}
+
+export interface Ticket {
+  legs: PickRow[];
+  combinedProb: number;
+  combinedOdds: number | null;
+  ev: number | null;
+}
+
+export interface HistoryPick {
+  id: number;
+  matchId: string;
+  leagueName: string;
+  kickoffUtc: string;
+  home: string;
+  away: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
+  market: string;
+  selection: string;
+  modelProb: number;
+  odds: number | null;
+  kind: string | null;
+  confidence: string | null;
+  predictedScore: string | null;
+  finalScore: string | null;
+  result: "win" | "loss" | "void" | null;
+}
+export interface History {
+  picks: HistoryPick[];
+  byMarket: { market: string; selection: string; wins: number; losses: number }[];
+  byBucket: { bucket: number; wins: number; losses: number }[];
+  open: number;
+}
+
 type Probs = Record<string, number>;
 export interface Report {
   matchId: string;
@@ -71,6 +126,8 @@ export interface Report {
   kickoffUtc: string;
   home: string;
   away: string;
+  homeCrest?: string | null;
+  awayCrest?: string | null;
   dataFreshness: { fixtures: string; odds: string | null };
   sample: { homeMatches: number; awayMatches: number };
   model: {

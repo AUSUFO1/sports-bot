@@ -3,7 +3,10 @@ import { getToken, setToken } from "./api";
 import { Games } from "./pages/Games";
 import { Game } from "./pages/Game";
 import { Leagues } from "./pages/Leagues";
+import { Picks } from "./pages/Picks";
+import { History } from "./pages/History";
 import { Footer } from "./components/Footer";
+import { isDark, setTheme } from "./theme";
 
 function useRoute(): string {
   const [route, setRoute] = useState(window.location.hash || "#/");
@@ -52,7 +55,14 @@ export function App() {
     setAuthed(false);
   };
 
+  const [dark, setDark] = useState(isDark());
+  const flipTheme = () => {
+    setTheme(isDark() ? "light" : "dark");
+    setDark(isDark());
+  };
+
   if (!authed) return <TokenScreen message={message} onSaved={() => setAuthed(true)} />;
+  const bad = () => logout("That token was not accepted. Enter it again.");
 
   const gameMatch = route.match(/^#\/game\/(.+)$/);
   return (
@@ -63,17 +73,23 @@ export function App() {
           <span>Data Is <b>Truth</b></span>
         </a>
         <nav>
-          <a href="#/" aria-current={route === "#/" || route === "" ? "page" : undefined}>Games</a>
-          <a href="#/leagues" aria-current={route === "#/leagues" ? "page" : undefined}>Leagues</a>
-          <button className="link" onClick={() => logout()}>Sign out</button>
+          <button className="iconbtn" aria-label="Switch light or dark" onClick={flipTheme}>{dark ? "☀" : "☾"}</button>
+          <a href="#/" aria-current={route === "#/" || route === "" ? "page" : undefined}>Picks</a>
+          <a href="#/games" aria-current={route === "#/games" ? "page" : undefined}>Games</a>
+          <a href="#/history" aria-current={route === "#/history" ? "page" : undefined}>History</a>
+          <a href="#/leagues" aria-current={route === "#/leagues" ? "page" : undefined}>More</a>
         </nav>
       </header>
       {gameMatch ? (
-        <Game id={decodeURIComponent(gameMatch[1]!)} onUnauthorized={() => logout("That token was not accepted. Enter it again.")} />
+        <Game id={decodeURIComponent(gameMatch[1]!)} onUnauthorized={bad} />
       ) : route === "#/leagues" ? (
-        <Leagues onUnauthorized={() => logout("That token was not accepted. Enter it again.")} />
+        <Leagues onUnauthorized={bad} onSignOut={() => logout()} />
+      ) : route === "#/games" ? (
+        <Games onUnauthorized={bad} />
+      ) : route === "#/history" ? (
+        <History onUnauthorized={bad} />
       ) : (
-        <Games onUnauthorized={() => logout("That token was not accepted. Enter it again.")} />
+        <Picks onUnauthorized={bad} />
       )}
     </>
   );

@@ -1,30 +1,36 @@
+/* Light is the base. Dark applies when the device is dark (unless the user chose light), or when the user chose dark. */
 :root {
   --bg: #ffffff;
   --card: #ffffff;
-  --soft: #f4f4f5;
+  --soft: #f3f4f7;
   --fg: #0b0b0c;
-  --muted: #6b6b73;
-  --line: #e9e9ec;
+  --muted: #666b78;
+  --line: #e7e9ee;
   --accent: #e10600;
   --good: #0a8f4e;
-  --good-bg: #e6f6ed;
+  --good-bg: #e3f6ec;
   --ink: #0b0b0c;
   --on-ink: #ffffff;
   --warn: #8a5a00;
   --warn-bg: #fff4d9;
   --bad: #c0261c;
-  --home: #0b0b0c;
-  --draw: #b9b9c0;
-  --away: #e10600;
-  color-scheme: light dark;
+  --loss-bg: #fde8e6;
+  --home: #2563eb;
+  --draw: #b9bcc6;
+  --away: #f97316;
+  --c-result: #2563eb;
+  --c-draw: #0d9488;
+  --c-goals: #d97706;
+  --c-btts: #7c3aed;
+  color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0b0b0c;
     --card: #141416;
     --soft: #1c1c1f;
     --fg: #f4f4f5;
-    --muted: #9a9aa3;
+    --muted: #9a9ca6;
     --line: #26262a;
     --accent: #ff4a3d;
     --good: #4ddb92;
@@ -34,11 +40,43 @@
     --warn: #f0c060;
     --warn-bg: #2f2711;
     --bad: #ff8a80;
-    --home: #f4f4f5;
-    --draw: #55555c;
-    --away: #ff4a3d;
+    --loss-bg: #3a1613;
+    --home: #6ea2ff;
+    --draw: #55565e;
+    --away: #ff9a52;
+    --c-result: #6ea2ff;
+    --c-draw: #2dd4bf;
+    --c-goals: #fbbf24;
+    --c-btts: #a78bfa;
+    color-scheme: dark;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0b0b0c;
+  --card: #141416;
+  --soft: #1c1c1f;
+  --fg: #f4f4f5;
+  --muted: #9a9ca6;
+  --line: #26262a;
+  --accent: #ff4a3d;
+  --good: #4ddb92;
+  --good-bg: #0f2a1d;
+  --ink: #f4f4f5;
+  --on-ink: #0b0b0c;
+  --warn: #f0c060;
+  --warn-bg: #2f2711;
+  --bad: #ff8a80;
+  --loss-bg: #3a1613;
+  --home: #6ea2ff;
+  --draw: #55565e;
+  --away: #ff9a52;
+  --c-result: #6ea2ff;
+  --c-draw: #2dd4bf;
+  --c-goals: #fbbf24;
+  --c-btts: #a78bfa;
+  color-scheme: dark;
+}
+
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -118,9 +156,9 @@ button.link { background: none; border: 0; color: var(--muted); padding: 6px 0; 
 .game:hover { border-color: var(--fg); }
 .gtop { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.74rem; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
 .gmain { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 8px; }
-.teams { display: flex; flex-direction: column; min-width: 0; font-weight: 600; font-size: 1.05rem; letter-spacing: -0.01em; }
-.teams span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.teams span + span { color: var(--muted); font-weight: 500; }
+.teams { display: flex; flex-direction: column; gap: 6px; min-width: 0; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
+.teams > span { overflow: hidden; }
+.teams > span + span { color: var(--muted); font-weight: 600; }
 .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; }
 .ev { font-size: 0.8rem; color: var(--good); font-weight: 600; font-variant-numeric: tabular-nums; }
 .prob { display: flex; height: 6px; border-radius: 3px; overflow: hidden; margin-top: 12px; gap: 2px; }
@@ -179,4 +217,43 @@ tr.hit td { color: var(--good); font-weight: 700; }
 
 .scores { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .scores li { background: var(--soft); border-radius: 10px; padding: 8px 12px; font-size: 0.9rem; }
+.badge.loss { background: var(--loss-bg); color: var(--bad); }
+
+/* club crests */
+.crest { border-radius: 50%; object-fit: contain; flex: none; display: inline-block; }
+.crest.fallback { display: inline-grid; place-items: center; background: var(--soft); color: var(--muted); font-weight: 700; letter-spacing: 0; }
+.teamline { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.teamline span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* colour per pick type */
+.g-result { --pc: var(--c-result); }
+.g-draw { --pc: var(--c-draw); }
+.g-goals { --pc: var(--c-goals); }
+.g-btts { --pc: var(--c-btts); }
+.tag { font-size: 0.66rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--pc); background: color-mix(in srgb, var(--pc) 14%, transparent); white-space: nowrap; }
+.pickrow .fill { background: var(--pc); }
+.pickrow strong { color: var(--pc); }
+
+.crests { display: flex; gap: 12px; margin: 6px 0 10px; }
+.pickname { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.meta .tag { align-self: flex-end; }
+
+/* theme switch */
+.seg { display: flex; gap: 8px; }
+.seg button { width: auto; flex: 1; background: var(--card); color: var(--fg); border-color: var(--line); font-weight: 500; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--on-ink); border-color: var(--ink); font-weight: 600; }
+.iconbtn { width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 10px; background: var(--soft); color: var(--fg); border: 0; font-size: 1rem; line-height: 1; flex: none; }
+@media (max-width: 359px) { .iconbtn { display: none; } }
+.track.wide { grid-column: 1 / -1; margin-top: 2px; }
+.pickrow { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.95rem; }
+.pickright { display: flex; align-items: center; gap: 8px; }
+.pickrow .muted { grid-column: 1 / -1; }
+.ticket { background: var(--soft); border-radius: 18px; padding: 16px; margin: 14px 0 6px; }
+.ticket h2 { color: var(--fg); font-size: 1rem; letter-spacing: 0; text-transform: none; }
+.legs li { display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.legs li > span:first-child { min-width: 0; }
+.combo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 12px 0 8px; }
+.combo div { background: var(--card); border-radius: 12px; padding: 10px 12px; }
+.combo strong { display: block; font-size: 1.4rem; letter-spacing: -0.02em; }
+.combo span { font-size: 0.74rem; color: var(--muted); }
 .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }

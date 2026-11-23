@@ -35,19 +35,22 @@ export async function upsertFixtures(
   src: Source,
 ) {
   if (fixtures.length === 0) return;
-  const team = db.prepare(`INSERT OR IGNORE INTO teams (id, league_id, name, aliases) VALUES (?1, ?2, ?3, '[]')`);
+  const team = db.prepare(
+    `INSERT INTO teams (id, league_id, name, aliases, crest) VALUES (?1, ?2, ?3, '[]', ?4)
+     ON CONFLICT(id) DO UPDATE SET crest = COALESCE(excluded.crest, teams.crest)`,
+  );
   const match = db.prepare(
     `INSERT INTO matches (id, league_id, season, kickoff_utc, home_team_id, away_team_id, status, home_goals, away_goals, source, fetched_at)
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
      ON CONFLICT(id) DO UPDATE SET kickoff_utc = excluded.kickoff_utc, status = excluded.status,
        home_goals = excluded.home_goals, away_goals = excluded.away_goals, fetched_at = excluded.fetched_at`,
   );
-  const teams = new Map<string, string>();
+  const teams = new Map<string, { name: string; crest: string | null }>();
   for (const f of fixtures) {
-    teams.set(`${src.prefix}-${f.home.providerId}`, f.home.name);
-    teams.set(`${src.prefix}-${f.away.providerId}`, f.away.name);
+    teams.set(`${src.prefix}-${f.home.providerId}`, { name: f.home.name, crest: f.home.crest ?? null });
+    teams.set(`${src.prefix}-${f.away.providerId}`, { name: f.away.name, crest: f.away.crest ?? null });
   }
-  const stmts: D1PreparedStatement[] = [...teams].map(([id, name]) => team.bind(id, leagueId, name));
+  const stmts: D1PreparedStatement[] = [...teams].map(([id, t]) => team.bind(id, leagueId, t.name, t.crest));
   for (const f of fixtures) {
     stmts.push(
       match.bind(

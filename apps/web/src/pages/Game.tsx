@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError, type Report } from "../api";
 import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, pct, signedPct, time } from "../format";
 import { Footer } from "../components/Footer";
+import { Crest } from "../components/Crest";
 
 export function Game({ id, onUnauthorized }: { id: string; onUnauthorized: () => void }) {
   const [r, setR] = useState<Report | null>(null);
@@ -37,6 +38,10 @@ function Detail({ r }: { r: Report }) {
     <>
       <header className="gamehead">
         <p className="muted">{dayLabel(r.kickoffUtc)} · {time(r.kickoffUtc)}</p>
+        <div className="crests">
+          <Crest src={r.homeCrest} name={r.home} size={56} />
+          <Crest src={r.awayCrest} name={r.away} size={56} />
+        </div>
         <h1>{r.home} <span className="vs">vs</span> {r.away}</h1>
         <p className="muted">
           <span className={`dot ${fx}`} aria-hidden /> Fixtures {ageText(r.dataFreshness.fixtures)} · Odds{" "}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type Game } from "../api";
 import { dayKey, dayLabel, freshness, ageText, pct, time } from "../format";
 import { Footer } from "../components/Footer";
+import { Crest } from "../components/Crest";
 
 export function Games({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [games, setGames] = useState<Game[] | null>(null);
@@ -88,8 +89,8 @@ export function Games({ onUnauthorized }: { onUnauthorized: () => void }) {
                   </div>
                   <div className="gmain">
                     <span className="teams">
-                      <span>{g.home}</span>
-                      <span>{g.away}</span>
+                      <span className="teamline"><Crest src={g.homeCrest} name={g.home} /><span>{g.home}</span></span>
+                      <span className="teamline"><Crest src={g.awayCrest} name={g.away} /><span>{g.away}</span></span>
                     </span>
                     <span className="meta">
                       <Badge game={g} />

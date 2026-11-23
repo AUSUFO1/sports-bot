@@ -4,3 +4,6 @@ export * from "./markets";
 export * from "./elo";
 export * from "./picks";
 export * from "./report";
+export * from "./targets";
+export * from "./settle";
+export * from "./ticket";

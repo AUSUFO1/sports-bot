@@ -18,6 +18,23 @@ export const MARKET_NAMES: Record<string, string> = {
   btts: "Both teams to score",
 };
 
+/** Plain-words name for a pick, e.g. "Over 2.5 goals", "Both teams score: Yes". */
+export function pickLabel(market: string, selection: string): string {
+  const m = /^ou_(\d)_(\d)$/.exec(market);
+  if (m) return `${selection === "over" ? "Over" : "Under"} ${m[1]}.${m[2]} goals`;
+  if (market === "btts") return `Both teams score: ${selection === "yes" ? "Yes" : "No"}`;
+  if (market === "1x2") return selection === "draw" ? "Draw" : selection === "home" ? "Home win" : "Away win";
+  return `${market} ${selection}`;
+}
+
+/** Colour group for a pick: result, draw, goals or btts. Drives the colour coding in the CSS. */
+export function pickGroup(market: string, selection: string): "result" | "draw" | "goals" | "btts" {
+  if (market === "btts") return "btts";
+  if (market.startsWith("ou_")) return "goals";
+  return selection === "draw" ? "draw" : "result";
+}
+export const GROUP_NAMES = { result: "Result", draw: "Draw", goals: "Goals", btts: "BTTS" } as const;
+
 export const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 export const dayLabel = (iso: string) =>
   new Date(iso).toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });

@@ -19,8 +19,8 @@ export interface Fixture {
   season: number;
   kickoffUtc: string;
   status: "scheduled" | "live" | "finished" | "postponed";
-  home: { providerId: string; name: string };
-  away: { providerId: string; name: string };
+  home: { providerId: string; name: string; crest?: string | null };
+  away: { providerId: string; name: string; crest?: string | null };
   homeGoals: number | null;
   awayGoals: number | null;
 }
