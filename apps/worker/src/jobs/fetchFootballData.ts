@@ -4,6 +4,7 @@ import { ProviderError, type Env } from "../types";
 
 const LEAGUES_EVERY_MS = 7 * 24 * 3600_000;
 const LEAGUE_REFRESH_MS = 5 * 3600_000;
+const CREST_RETRY_MS = 24 * 3600_000;
 const LEAGUES_PER_RUN = 3; // free Workers allow 50 queries per run; each league uses about a dozen
 const GAP_MS = 7000; // free plan allows 10 calls per minute
 const PAST_DAYS = 2;
@@ -35,9 +36,10 @@ export async function fetchFootballData(env: Env, now = new Date(), maxLeagues =
     }
 
     const rows = await env.DB.prepare(
-      `SELECT l.id, l.provider_ids, (SELECT COUNT(*) FROM matches m WHERE m.league_id = l.id) AS n
+      `SELECT l.id, l.provider_ids, (SELECT COUNT(*) FROM matches m WHERE m.league_id = l.id) AS n,
+              (SELECT COUNT(*) FROM teams t WHERE t.league_id = l.id AND t.crest IS NULL) AS no_crest
        FROM leagues l WHERE l.active = 1 AND l.id LIKE 'fd-%' ORDER BY l.id`,
-    ).all<{ id: string; provider_ids: string; n: number }>();
+    ).all<{ id: string; provider_ids: string; n: number; no_crest: number }>();
     const todo = rows.results.filter((r) => JSON.parse(r.provider_ids).season != null);
 
     if (todo.length > 0) {
@@ -46,10 +48,15 @@ export async function fetchFootballData(env: Env, now = new Date(), maxLeagues =
       for (let i = 0; i < todo.length && done < maxLeagues; i++) {
         const league = todo[cursor]!;
         cursor = (cursor + 1) % todo.length;
+        // A league with teams that have no crest yet reloads its WHOLE season once (one call), because the small
+        // refresh window only reaches the teams playing soon. Tried at most once a day, in case a provider has no crest for a team.
+        const crestFullAt = Number((await env.KV.get(`fd:crestfull:${league.id}`)) ?? 0);
+        const needCrests = league.no_crest > 0 && now.getTime() - crestFullAt > CREST_RETRY_MS;
         const last = Number((await env.KV.get(`fd:fetched:${league.id}`)) ?? 0);
-        if (now.getTime() - last < LEAGUE_REFRESH_MS) continue; // cached, nothing to refetch
+        if (!needCrests && now.getTime() - last < LEAGUE_REFRESH_MS) continue; // cached, nothing to refetch
         const ids = JSON.parse(league.provider_ids);
-        const full = league.n === 0;
+        const full = league.n === 0 || needCrests;
+        if (needCrests) await env.KV.put(`fd:crestfull:${league.id}`, String(now.getTime()));
         const from = full ? "" : day(new Date(now.getTime() - PAST_DAYS * 86400_000));
         const to = full ? "" : day(new Date(now.getTime() + FUTURE_DAYS * 86400_000));
         const fixtures = await provider.getFixtures(String(ids.footballData), Number(ids.season), from, to);
