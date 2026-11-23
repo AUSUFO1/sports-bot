@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, type Report } from "../api";
-import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, pct, signedPct, time } from "../format";
+import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, pct, pickLabel, signedPct, time } from "../format";
 import { Footer } from "../components/Footer";
 import { Crest } from "../components/Crest";
 
@@ -134,6 +134,37 @@ function Detail({ r }: { r: Report }) {
               </div>
             )}
           </section>
+
+          {r.market.byBook && Object.keys(r.market.byBook).length > 0 && (
+            <section>
+              <h2>Bookmaker prices</h2>
+              <div className="tablewrap">
+                <table>
+                  <thead>
+                    <tr><th>Pick</th><th>Model</th><th>Pinnacle</th><th>1xBet</th></tr>
+                  </thead>
+                  <tbody>
+                    {["1x2", "ou_2_5", "btts", "ou_3_5", "ou_1_5"].flatMap((m) =>
+                      Object.entries(r.model!.probabilities[m] ?? {}).map(([sel, p]) => {
+                        const pin = r.market.byBook?.pinnacle?.[m]?.[sel];
+                        const xb = r.market.byBook?.["1xbet"]?.[m]?.[sel];
+                        if (pin === undefined && xb === undefined) return null;
+                        return (
+                          <tr key={m + sel}>
+                            <td>{pickLabel(m, sel)}</td>
+                            <td>{pct(p)}</td>
+                            <td>{pin !== undefined ? pin.toFixed(2) : "—"}</td>
+                            <td>{xb !== undefined ? xb.toFixed(2) : "—"}</td>
+                          </tr>
+                        );
+                      }),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <p className="muted small">Pinnacle is the sharpest price and sets the fair odds. SportyBet usually pays a little less, so check its price before you place anything.</p>
+            </section>
+          )}
 
           <section>
             <h2>Most likely scores</h2>

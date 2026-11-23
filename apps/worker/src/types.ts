@@ -4,6 +4,8 @@ export interface Env {
   APP_TOKEN?: string;
   API_FOOTBALL_KEY?: string;
   FOOTBALL_DATA_KEY?: string;
+  /** a second token that can ONLY reach /api/odds/* (used by the GitHub odds job) */
+  INGEST_TOKEN?: string;
 }
 
 export interface LeagueInfo {

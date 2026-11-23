@@ -3,7 +3,7 @@
  * Thresholds are STARTING VALUES, to be tuned from the backtest (Phase 3), never by feel.
  * A "model" pick comes from the model's probability alone; a "value" pick also passes the odds rules.
  */
-import { DEFAULT_PICK_CONFIG, type PickConfig } from "./picks";
+import { DEFAULT_PICK_CONFIG, suspiciousEdge, type PickConfig } from "./picks";
 
 export interface Target {
   market: string;
@@ -32,6 +32,10 @@ export interface TopPick {
   minProb: number;
   /** how far above its threshold the probability is (bigger = stronger) */
   strength: number;
+  /** odds at which the pick has zero expected value: 1 / probability */
+  breakEven: number;
+  /** the lowest odds worth taking: (1 + minimum EV) / probability. Below this the price is too short. */
+  minOdds: number;
   kind: "value" | "model";
   odds: number | null;
   ev: number | null;
@@ -76,17 +80,21 @@ export function topPicks(
     const flags: string[] = [];
     if (!v) flags.push("No odds yet");
     else if (v.ev < 0) flags.push("Odds too low: no value");
+    else if (suspiciousEdge(v.edge, cfg)) flags.push("Far above the sharp market: likely model error");
     out.push({
       market: t.market,
       selection: t.selection,
       modelProb: p,
       minProb: t.minProb,
       strength: p - t.minProb,
+      breakEven: 1 / p,
+      minOdds: (1 + cfg.minEv) / p,
       kind: isValue ? "value" : "model",
       odds: v?.odds ?? null,
       ev: v?.ev ?? null,
       edge: v?.edge ?? null,
-      ticketOk: !v || v.ev >= 0,
+      // Fine for a ticket when there are no odds, or the price still has value and the edge is believable.
+      ticketOk: !v || (v.ev >= 0 && !suspiciousEdge(v.edge, cfg)),
       flags,
     });
   }

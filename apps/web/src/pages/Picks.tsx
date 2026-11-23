@@ -43,7 +43,8 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
       `Ticket (${ticket.legs.length} legs)`,
       ...ticket.legs.map((l) => `${l.home} vs ${l.away}: ${pickLabel(l.market, l.selection)}${l.odds ? ` @ ${l.odds.toFixed(2)}` : ""}`),
       `Model chance all win: ${pct(ticket.combinedProb)}`,
-      ticket.combinedOdds ? `Combined odds: ${ticket.combinedOdds.toFixed(2)}` : "Odds not available yet",
+      ticket.combinedOdds ? `Reference combined odds: ${ticket.combinedOdds.toFixed(2)}` : "Reference odds not available yet",
+      `Take it on SportyBet only if combined odds are at least ${(ticket.minCombinedOdds ?? ticket.breakEvenOdds).toFixed(2)}`,
     ].join("\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -86,8 +87,13 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
             </ul>
             <div className="combo">
               <div><strong>{pct(ticket.combinedProb)}</strong><span>chance every leg wins</span></div>
-              <div><strong>{ticket.combinedOdds ? ticket.combinedOdds.toFixed(2) : "—"}</strong><span>{ticket.combinedOdds ? "combined odds" : "odds not available yet"}</span></div>
+              <div><strong>{ticket.combinedOdds ? ticket.combinedOdds.toFixed(2) : "—"}</strong><span>{ticket.combinedOdds ? "reference odds" : "no reference odds yet"}</span></div>
             </div>
+            <p className="takeline">
+              Take the ticket on SportyBet only if its combined odds are at least{" "}
+              <strong>{(ticket.minCombinedOdds ?? ticket.breakEvenOdds).toFixed(2)}</strong>
+              <span className="muted small"> (break-even {ticket.breakEvenOdds.toFixed(2)})</span>
+            </p>
             <p className="muted small">More legs means a lower chance. Load these on your betting site by hand.</p>
             <button onClick={copy}>{copied ? "Copied" : "Copy ticket"}</button>
           </>
@@ -129,7 +135,20 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
                           <strong>{pct(p.modelProb)}</strong>
                         </span>
                         <span className="track wide"><span className="fill model" style={{ width: `${p.modelProb * 100}%` }} /></span>
-                        {p.flags.length > 0 && <span className="muted small">{p.flags.join(" · ")}</span>}
+                        {(p.refPinnacle || p.ref1xbet) && (
+                          <span className="refline">
+                            {p.refPinnacle ? `Pinnacle ${p.refPinnacle.toFixed(2)}` : ""}
+                            {p.refPinnacle && p.ref1xbet ? " · " : ""}
+                            {p.ref1xbet ? `1xBet ${p.ref1xbet.toFixed(2)}` : ""}
+                          </span>
+                        )}
+                        {p.minOdds && (
+                          <span className="takeline">
+                            On SportyBet, take it only at <strong>{p.minOdds.toFixed(2)}</strong> or higher
+                            <span className="muted small"> (break-even {p.breakEven?.toFixed(2)})</span>
+                          </span>
+                        )}
+                        {p.flags.length > 0 && <span className={p.flags.some((f) => f.startsWith("Far above")) ? "warnline" : "muted small"}>{p.flags.join(" · ")}</span>}
                       </div>
                     ))}
                   </a>

@@ -82,6 +82,12 @@ export interface PickRow {
   kind: "value" | "model";
   odds: number | null;
   ev: number | null;
+  /** lowest odds worth taking, and the odds where the pick breaks even */
+  minOdds: number | null;
+  breakEven: number | null;
+  /** reference prices from the odds job, when known */
+  refPinnacle: number | null;
+  ref1xbet: number | null;
   ticketOk: boolean;
   flags: string[];
 }
@@ -91,6 +97,8 @@ export interface Ticket {
   combinedProb: number;
   combinedOdds: number | null;
   ev: number | null;
+  breakEvenOdds: number;
+  minCombinedOdds: number | null;
 }
 
 export interface HistoryPick {
@@ -137,7 +145,12 @@ export interface Report {
     topScorelines: { score: string; prob: number }[];
     eloCheck: { home: number; draw: number; away: number; agrees: boolean };
   } | null;
-  market: { bestOdds: Record<string, Probs>; fairProbabilities: Record<string, Probs>; marginByMarket: Record<string, number> };
+  market: {
+    bestOdds: Record<string, Probs>;
+    fairProbabilities: Record<string, Probs>;
+    marginByMarket: Record<string, number>;
+    byBook?: Record<string, Record<string, Probs>>;
+  };
   value: { market: string; selection: string; modelProb: number; fairProb: number; edge: number; odds: number; ev: number }[];
   shortlist: { market: string; selection: string; odds: number; ev: number; confidence: string }[];
   verdict: "BET_CANDIDATE" | "NO_BET";

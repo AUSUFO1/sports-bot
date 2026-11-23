@@ -7,6 +7,7 @@ import {
   confidenceOf,
   DEFAULT_PICK_CONFIG,
   modelsAgree,
+  suspiciousEdge,
   shortlist,
   valueRows,
   verdictOf,
@@ -16,6 +17,8 @@ import {
 } from "./picks";
 
 export const MODEL_VERSION = "poisson-v1";
+/** The sharp bookmaker whose prices define the "fair" market probability. */
+export const REFERENCE_BOOK = "pinnacle";
 
 /** One bookmaker price. Callers pass the LATEST price per bookmaker, market and selection. */
 export interface OddsInput {
@@ -67,9 +70,12 @@ export interface Report {
     eloCheck: { home: number; draw: number; away: number; agrees: boolean };
   } | null;
   market: {
+    /** the prices used for value: Pinnacle's when it prices the whole market, else the best across books */
     bestOdds: Record<string, Probs>;
     fairProbabilities: Record<string, Probs>;
     marginByMarket: Record<string, number>;
+    /** every bookmaker's price: byBook[slug][market][selection] */
+    byBook: Record<string, Record<string, Probs>>;
   };
   value: { market: string; selection: string; modelProb: number; fairProb: number; edge: number; odds: number; ev: number }[];
   shortlist: { market: string; selection: string; odds: number; ev: number; confidence: "LOW" | "MEDIUM" | "HIGH" }[];
@@ -89,7 +95,7 @@ export function buildReport(input: ReportInput): Report {
   const cfg = input.config ?? DEFAULT_PICK_CONFIG;
   const now = Date.parse(input.now);
   const warnings: string[] = [];
-  const emptyMarket = { bestOdds: {}, fairProbabilities: {}, marginByMarket: {} };
+  const emptyMarket = { bestOdds: {}, fairProbabilities: {}, marginByMarket: {}, byBook: {} };
   const base = {
     matchId: input.matchId,
     league: input.league,
@@ -148,6 +154,7 @@ export function buildReport(input: ReportInput): Report {
   const fair: Record<string, Probs> = {};
   const margins: Record<string, number> = {};
   const books: Record<string, Set<string>> = {};
+  const byBook: Record<string, Record<string, Probs>> = {};
   const candidates: Candidate[] = [];
   let oldest = Infinity;
   let newest = -Infinity;
@@ -156,8 +163,11 @@ export function buildReport(input: ReportInput): Report {
     const rows = input.odds.filter((o) => o.market === market && selections.includes(o.selection) && o.decimalOdds > 1);
     if (rows.length === 0) continue;
     const best: Probs = {};
+    const ref: Probs = {};
     for (const r of rows) {
       best[r.selection] = Math.max(best[r.selection] ?? 0, r.decimalOdds);
+      if (r.bookmaker === REFERENCE_BOOK) ref[r.selection] = r.decimalOdds;
+      ((byBook[r.bookmaker] ??= {})[market] ??= {})[r.selection] = r.decimalOdds;
       (books[market] ??= new Set()).add(r.bookmaker);
       const t = Date.parse(r.capturedAt);
       oldest = Math.min(oldest, t);
@@ -167,13 +177,17 @@ export function buildReport(input: ReportInput): Report {
       warnings.push(`Market ${market} is missing a selection, so it was skipped`);
       continue;
     }
-    const { fair: f, margin } = removeMargin(selections.map((s) => best[s]!));
-    bestOdds[market] = best;
+    // The sharp reference book (Pinnacle) sets the fair price when it prices the whole market.
+    // Otherwise fall back to the best price across the bookmakers we have.
+    const useRef = selections.every((s) => ref[s] !== undefined);
+    const priced = useRef ? ref : best;
+    const { fair: f, margin } = removeMargin(selections.map((s) => priced[s]!));
+    bestOdds[market] = priced;
     fair[market] = Object.fromEntries(selections.map((s, i) => [s, f[i]!]));
     margins[market] = margin;
-    if (books[market]!.size === 1) warnings.push(`Only 1 bookmaker priced ${market}`);
+    if (!useRef && books[market]!.size === 1) warnings.push(`Only 1 bookmaker priced ${market}`);
     for (const s of selections) {
-      candidates.push({ market, selection: s, modelProb: probabilities[market]![s]!, fairProb: fair[market]![s]!, odds: best[s]! });
+      candidates.push({ market, selection: s, modelProb: probabilities[market]![s]!, fairProb: fair[market]![s]!, odds: priced[s]! });
     }
   }
 
@@ -183,6 +197,12 @@ export function buildReport(input: ReportInput): Report {
   if (hasOdds && oddsAgeHours > cfg.maxOddsAgeHours) warnings.push(`Odds are ${Math.round(oddsAgeHours)} hours old`);
 
   const value: ValueRow[] = valueRows(candidates);
+  const far = value.filter((v) => suspiciousEdge(v.edge, cfg)).sort((a, b) => b.edge - a.edge).slice(0, 3);
+  for (const v of far) {
+    warnings.push(
+      `Model is ${(v.edge * 100).toFixed(0)} points above the market on ${v.market} ${v.selection}: more likely a model error than value`,
+    );
+  }
   const ctx = { homeMatches: lam.homeMatches, awayMatches: lam.awayMatches, oddsAgeHours, modelGap };
   const list = hasOdds ? shortlist(value, ctx, cfg) : [];
   const picks = topPicks(
@@ -210,7 +230,7 @@ export function buildReport(input: ReportInput): Report {
       topScorelines: topScorelines(matrix, 5),
       eloCheck: { ...elo, agrees },
     },
-    market: { bestOdds, fairProbabilities: fair, marginByMarket: margins },
+    market: { bestOdds, fairProbabilities: fair, marginByMarket: margins, byBook },
     value: value.map((v) => ({
       market: v.market,
       selection: v.selection,

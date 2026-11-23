@@ -39,6 +39,13 @@ describe("shortlist rules (all must hold)", () => {
   it("fails when Poisson and Elo disagree by more than 0.15", () => {
     expect(shortlist(row(), { ...good, modelGap: 0.2 })).toHaveLength(0);
   });
+  it("fails when the edge is suspiciously big: model 0.62 vs fair 0.50 is 12 points (EV 0.24)", () => {
+    // Beating the sharp market by 12 points is far more likely a model error than value.
+    expect(shortlist(row({ modelProb: 0.62, fairProb: 0.5, odds: 2.0 }), good)).toHaveLength(0);
+  });
+  it("an edge of exactly 10 points is still allowed (model 0.60, fair 0.50, odds 1.95: edge 0.10, EV 0.17)", () => {
+    expect(shortlist(row({ modelProb: 0.6, fairProb: 0.5, odds: 1.95 }), good)).toHaveLength(1);
+  });
   it("an empty shortlist means NO_BET", () => expect(verdictOf([])).toBe("NO_BET"));
 });
 

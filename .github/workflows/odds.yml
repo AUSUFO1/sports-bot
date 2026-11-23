@@ -1,0 +1,32 @@
+name: Fetch odds
+
+# Downloads reference odds from OddsPapi twice a day and sends the matched result to the Worker.
+# Needs two repository secrets: ODDS_API_KEY and INGEST_TOKEN.
+on:
+  schedule:
+    - cron: "0 7 * * *"   # 08:00 Nigeria time
+    - cron: "0 15 * * *"  # 16:00 Nigeria time
+  workflow_dispatch: {}    # the "Run workflow" button, for a manual run
+
+permissions:
+  contents: read
+
+concurrency:
+  group: odds
+  cancel-in-progress: false
+
+jobs:
+  odds:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Fetch and send odds
+        env:
+          API_URL: https://sports-bot-api.oabubakar2019.workers.dev
+          INGEST_TOKEN: ${{ secrets.INGEST_TOKEN }}
+          ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
+        run: node scripts/fetch-odds.mjs

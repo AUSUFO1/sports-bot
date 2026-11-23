@@ -28,6 +28,22 @@ describe("top picks", () => {
     expect(p[0]!.kind).toBe("model");
     expect(p[0]!.flags).toContain("No odds yet");
   });
+  it("a pick far above the sharp market is flagged and kept off the ticket", () => {
+    const p = topPicks(
+      base({
+        value: [{ market: "1x2", selection: "home", odds: 1.76, ev: 0.19, edge: 0.14 }], // 14 points over the market
+        shortlisted: [], // the report never shortlists it
+      }),
+    ).find((x) => x.market === "1x2")!;
+    expect(p.kind).toBe("model");
+    expect(p.flags).toContain("Far above the sharp market: likely model error");
+    expect(p.ticketOk).toBe(false);
+  });
+  it("minimum odds: break-even 1/0.68 = 1.4706 and take-at-least (1 + 0.05)/0.68 = 1.5441", () => {
+    const home = topPicks(base()).find((x) => x.market === "1x2")!;
+    expect(home.breakEven).toBeCloseTo(1.470588, 5);
+    expect(home.minOdds).toBeCloseTo(1.544118, 5);
+  });
   it("btts yes at 0.59 stays out (needs 0.60); under 3.5 at 0.55 stays out (needs 0.80)", () => {
     const keys = topPicks(base({ probabilities: { ...base().probabilities, "1x2": { home: 0.4, draw: 0.3, away: 0.3 } } })).map((x) => x.selection);
     expect(keys).not.toContain("yes");
@@ -114,6 +130,14 @@ describe("ticket", () => {
     expect(t.combinedProb).toBeCloseTo(0.6, 12); // 0.8 * 0.75
     expect(t.combinedOdds).toBeCloseTo(1.75, 12); // 1.25 * 1.4
     expect(t.ev).toBeCloseTo(0.05, 12); // 0.6 * 1.75 - 1
+  });
+  it("ticket minimum odds: break-even 1/0.6 = 1.6667; take-at-least 1.05/0.8 * 1.05/0.75 = 1.3125 * 1.4 = 1.8375", () => {
+    const t = buildTicket([c("1", 0.8, null, { minOdds: 1.05 / 0.8 }), c("2", 0.75, null, { minOdds: 1.05 / 0.75 })])!;
+    expect(t.breakEvenOdds).toBeCloseTo(1.666667, 5);
+    expect(t.minCombinedOdds).toBeCloseTo(1.8375, 9);
+  });
+  it("minCombinedOdds is null when a leg has no minimum", () => {
+    expect(buildTicket([c("1", 0.8, null, { minOdds: 1.3 }), c("2", 0.75, null)])!.minCombinedOdds).toBeNull();
   });
   it("no odds on a leg means no combined odds and no EV", () => {
     const t = buildTicket([c("1", 0.8, 1.25), c("2", 0.75, null)])!;

@@ -129,3 +129,60 @@ describe("safety rules", () => {
     expect(JSON.stringify(buildReport(input()))).toBe(JSON.stringify(buildReport(input())));
   });
 });
+
+describe("far-above-market guard", () => {
+  // Pinnacle 5.0 / 2.2 / 2.2: implied 0.2 + 0.454545 + 0.454545 = 1.109091, fair home = 0.2 / 1.109091 = 0.180328.
+  // Model home 0.345746 minus 0.180328 = 0.165 edge: too big to believe.
+  const r = buildReport(
+    input({
+      odds: [
+        odd("home", 5.0, undefined, "1x2", "pinnacle"),
+        odd("draw", 2.2, undefined, "1x2", "pinnacle"),
+        odd("away", 2.2, undefined, "1x2", "pinnacle"),
+      ],
+    }),
+  );
+  it("computes the huge edge by hand", () => {
+    expect(r.value.find((v) => v.selection === "home")!.edge).toBeCloseTo(0.165418, 4);
+  });
+  it("does not shortlist it as value: verdict stays NO_BET", () => {
+    expect(r.shortlist).toEqual([]);
+    expect(r.verdict).toBe("NO_BET");
+  });
+  it("warns that it is more likely a model error", () => {
+    expect(r.warnings.join(" ")).toMatch(/17 points above the market on 1x2 home: more likely a model error/);
+  });
+});
+
+describe("reference book (Pinnacle) and per-bookmaker odds", () => {
+  // Pinnacle 3.4 / 2.6 / 2.6 sets the fair price (margin 0.063348, fair home 0.276596).
+  // 1xBet shows 3.6 / 2.9 / 2.3: kept for display only, never used for the fair price.
+  const mixed = [
+    odd("home", 3.4, undefined, "1x2", "pinnacle"), odd("draw", 2.6, undefined, "1x2", "pinnacle"), odd("away", 2.6, undefined, "1x2", "pinnacle"),
+    odd("home", 3.6, undefined, "1x2", "1xbet"), odd("draw", 2.9, undefined, "1x2", "1xbet"), odd("away", 2.3, undefined, "1x2", "1xbet"),
+  ];
+  const r = buildReport(input({ odds: mixed }));
+  it("fair price and value come from Pinnacle even when another book pays more", () => {
+    expect(r.market.bestOdds["1x2"]!.home).toBe(3.4); // not 3.6
+    expect(r.market.fairProbabilities["1x2"]!.home).toBeCloseTo(0.276596, 5);
+    expect(r.market.marginByMarket["1x2"]).toBeCloseTo(0.063348, 5);
+    expect(r.value.find((v) => v.selection === "home")!.ev).toBeCloseTo(0.175536, 4);
+  });
+  it("keeps every bookmaker's own prices for display", () => {
+    expect(r.market.byBook.pinnacle!["1x2"]!.home).toBe(3.4);
+    expect(r.market.byBook["1xbet"]!["1x2"]!.home).toBe(3.6);
+    expect(r.market.byBook["1xbet"]!["1x2"]!.away).toBe(2.3);
+  });
+  it("no 'only 1 bookmaker' warning when the reference book prices the market", () => {
+    expect(r.warnings.join(" ")).not.toMatch(/Only 1 bookmaker/);
+  });
+  it("without Pinnacle it falls back to the best price across books (old behaviour)", () => {
+    const fb = buildReport(input({ odds: [odd("home", 3.4), odd("draw", 2.6), odd("away", 2.6), odd("home", 3.6, undefined, "1x2", "bk2")] }));
+    expect(fb.market.bestOdds["1x2"]!.home).toBe(3.6);
+  });
+  it("an incomplete Pinnacle market is not used as the reference", () => {
+    const part = buildReport(input({ odds: [odd("home", 3.4, undefined, "1x2", "pinnacle"), odd("home", 3.0), odd("draw", 2.6), odd("away", 2.6)] }));
+    expect(part.market.bestOdds["1x2"]!.home).toBe(3.4); // best across books (3.4 beats 3.0), computed from the full set
+    expect(part.market.byBook.pinnacle!["1x2"]!.draw).toBeUndefined();
+  });
+});

@@ -9,6 +9,8 @@ export interface TicketCandidate {
   selection: string;
   modelProb: number;
   odds: number | null;
+  /** lowest odds worth taking on this leg (see TopPick.minOdds) */
+  minOdds?: number;
   kind: "value" | "model";
   ticketOk: boolean;
 }
@@ -21,6 +23,10 @@ export interface Ticket {
   combinedOdds: number | null;
   /** model-implied value of the whole ticket, only when odds are known */
   ev: number | null;
+  /** break-even combined odds: 1 / combinedProb. Take the ticket only if the real combined odds are at least this. */
+  breakEvenOdds: number;
+  /** lowest combined odds worth taking: product of every leg's minOdds, when all legs have one */
+  minCombinedOdds: number | null;
 }
 
 /**
@@ -39,5 +45,13 @@ export function buildTicket(cands: TicketCandidate[], maxLegs = 4, now = Date.no
   const combinedProb = legs.reduce((p, l) => p * l.modelProb, 1);
   const allOdds = legs.every((l) => l.odds !== null);
   const combinedOdds = allOdds ? legs.reduce((p, l) => p * l.odds!, 1) : null;
-  return { legs, combinedProb, combinedOdds, ev: combinedOdds === null ? null : combinedProb * combinedOdds - 1 };
+  const minCombinedOdds = legs.every((l) => l.minOdds !== undefined) ? legs.reduce((p, l) => p * l.minOdds!, 1) : null;
+  return {
+    legs,
+    combinedProb,
+    combinedOdds,
+    ev: combinedOdds === null ? null : combinedProb * combinedOdds - 1,
+    breakEvenOdds: 1 / combinedProb,
+    minCombinedOdds,
+  };
 }

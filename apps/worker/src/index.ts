@@ -4,6 +4,7 @@ import { buildTicket, type TicketCandidate } from "@sports/stats";
 import { buildReports } from "./jobs/buildReports";
 import { fetchFootballData } from "./jobs/fetchFootballData";
 import { settlePicks } from "./jobs/settlePicks";
+import { registerOddsRoutes } from "./routes/odds";
 import type { Env } from "./types";
 
 const app = new Hono<{ Bindings: Env }>();
@@ -22,12 +23,18 @@ app.use(
 app.get("/api/health", (c) => c.json({ ok: true, service: "sports-bot-api" }));
 
 app.use("/api/*", async (c, next) => {
-  const token = c.env.APP_TOKEN;
-  if (!token || c.req.header("Authorization") !== `Bearer ${token}`) {
-    return c.json({ error: "unauthorized" }, 401);
-  }
+  const sent = c.req.header("Authorization") ?? "";
+  const appToken = c.env.APP_TOKEN;
+  const ingest = c.env.INGEST_TOKEN;
+  // The app token opens everything. The ingest token opens ONLY /api/odds/*, so the GitHub odds job can never read picks.
+  const ok =
+    (!!appToken && sent === `Bearer ${appToken}`) ||
+    (!!ingest && c.req.path.startsWith("/api/odds/") && sent === `Bearer ${ingest}`);
+  if (!ok) return c.json({ error: "unauthorized" }, 401);
   await next();
 });
+
+registerOddsRoutes(app);
 
 // All leagues the provider lists. A league with no matches yet says "not_filled".
 app.get("/api/leagues", async (c) => {
@@ -111,6 +118,9 @@ async function upcomingPicks(env: Env) {
             json_extract(r.report_json, '$.confidence') AS confidence,
             json_extract(p.value, '$.market') AS market, json_extract(p.value, '$.selection') AS selection,
             json_extract(p.value, '$.modelProb') AS modelProb, json_extract(p.value, '$.strength') AS strength,
+            json_extract(p.value, '$.minOdds') AS minOdds, json_extract(p.value, '$.breakEven') AS breakEven,
+            json_extract(r.report_json, '$.market.byBook.pinnacle."' || json_extract(p.value, '$.market') || '"."' || json_extract(p.value, '$.selection') || '"') AS refPinnacle,
+            json_extract(r.report_json, '$.market.byBook."1xbet"."' || json_extract(p.value, '$.market') || '"."' || json_extract(p.value, '$.selection') || '"') AS ref1xbet,
             json_extract(p.value, '$.kind') AS kind, json_extract(p.value, '$.odds') AS odds,
             json_extract(p.value, '$.ev') AS ev, json_extract(p.value, '$.ticketOk') AS ticketOk,
             json_extract(p.value, '$.flags') AS flags

@@ -9,6 +9,11 @@ export interface PickConfig {
   maxOddsAgeHours: number;
   /** Poisson and Elo 1X2 may differ by at most this much per outcome */
   maxModelDisagreement: number;
+  /**
+   * An edge bigger than this over the sharp market price is treated as a likely MODEL ERROR, not value:
+   * the sharp books are right far more often than a simple Poisson model.
+   */
+  maxEdge: number;
 }
 
 export const DEFAULT_PICK_CONFIG: PickConfig = {
@@ -17,6 +22,7 @@ export const DEFAULT_PICK_CONFIG: PickConfig = {
   minMatches: 8,
   maxOddsAgeHours: 6,
   maxModelDisagreement: 0.15,
+  maxEdge: 0.1,
 };
 
 export type Confidence = "LOW" | "MEDIUM" | "HIGH";
@@ -52,6 +58,11 @@ export function valueRows(cands: Candidate[]): ValueRow[] {
   }));
 }
 
+/** True when the model sits suspiciously far above the sharp market price. */
+export function suspiciousEdge(edge: number, cfg: PickConfig = DEFAULT_PICK_CONFIG): boolean {
+  return edge > cfg.maxEdge + EPS;
+}
+
 export function modelsAgree(gap: number, cfg: PickConfig = DEFAULT_PICK_CONFIG): boolean {
   return gap <= cfg.maxModelDisagreement + EPS;
 }
@@ -81,7 +92,7 @@ export function shortlist(
   if (!enoughData || !fresh || !modelsAgree(ctx.modelGap, cfg)) return [];
   const confidence = confidenceOf(ctx, cfg);
   return rows
-    .filter((r) => r.ev + EPS >= cfg.minEv && r.edge + EPS >= cfg.minEdge)
+    .filter((r) => r.ev + EPS >= cfg.minEv && r.edge + EPS >= cfg.minEdge && r.edge <= cfg.maxEdge + EPS)
     .map((r) => ({ market: r.market, selection: r.selection, odds: r.odds, ev: r.ev, confidence }));
 }
 
