@@ -170,7 +170,14 @@ export function History({ onUnauthorized }: { onUnauthorized: () => void }) {
             <div className="empty"><p><strong>{h.picks.length === 0 ? "Nothing logged yet." : "No picks match these filters."}</strong></p></div>
           )}
           <ul className="games">
-            {h.picks.filter((p) => shown.includes(p)).map((p) => (
+            {/* Finished picks (won, lost, void) first, newest first; then picks still waiting, soonest kickoff first. */}
+            {h.picks
+              .filter((p) => shown.includes(p))
+              .sort((a, b) =>
+                Number(a.result === null) - Number(b.result === null) ||
+                (a.result === null ? a.kickoffUtc.localeCompare(b.kickoffUtc) : b.kickoffUtc.localeCompare(a.kickoffUtc)),
+              )
+              .map((p) => (
               <li key={p.id}>
                 <a className="game" href={`#/game/${encodeURIComponent(p.matchId)}`}>
                   <div className="gtop">
