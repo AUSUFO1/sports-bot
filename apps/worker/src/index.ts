@@ -101,6 +101,8 @@ app.get("/api/games", async (c) => {
             json_extract(r.report_json, '$.model.probabilities.btts.yes') AS pBtts,
             json_extract(r.report_json, '$.model.rawProbabilities.ou_2_5.over') AS rawOver25,
             json_extract(r.report_json, '$.model.rawProbabilities.btts.yes') AS rawBtts,
+            json_extract(r.report_json, '$.model.probabilities.ou_3_5.under') AS pUnder35,
+            json_extract(r.report_json, '$.model.rawProbabilities.ou_3_5.under') AS rawUnder35,
             (SELECT MAX(json_extract(v.value, '$.ev')) FROM json_each(r.report_json, '$.shortlist') v) AS bestEv
      FROM matches m
      JOIN leagues l ON l.id = m.league_id

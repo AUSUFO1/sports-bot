@@ -92,6 +92,8 @@ export interface Game {
   /** our own model's numbers, before following Pinnacle */
   rawOver25: number | null;
   rawBtts: number | null;
+  pUnder35: number | null;
+  rawUnder35: number | null;
 }
 
 export interface LeagueRow {
