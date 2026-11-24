@@ -6,6 +6,7 @@ import { Leagues } from "./pages/Leagues";
 import { Picks } from "./pages/Picks";
 import { History } from "./pages/History";
 import { Health } from "./pages/Health";
+import { Goals } from "./pages/Goals";
 import { Footer } from "./components/Footer";
 import { isDark, setTheme } from "./theme";
 import { BRAND_MARK, BRAND_NAME } from "./brand";
@@ -92,6 +93,7 @@ export function App() {
         <nav>
           <button className="iconbtn" aria-label="Switch light or dark" onClick={flipTheme}>{dark ? "☀" : "☾"}</button>
           <a href="#/" aria-current={route === "#/" || route === "" ? "page" : undefined}>Picks</a>
+          <a href="#/goals" aria-current={route === "#/goals" ? "page" : undefined}>Goals</a>
           <a href="#/games" aria-current={route === "#/games" ? "page" : undefined}>Games</a>
           <a href="#/history" aria-current={route === "#/history" ? "page" : undefined}>History</a>
           <a href="#/leagues" aria-current={route === "#/leagues" || route === "#/health" ? "page" : undefined}>More</a>
@@ -101,6 +103,8 @@ export function App() {
         <Game id={decodeURIComponent(gameMatch[1]!)} onUnauthorized={bad} />
       ) : route === "#/leagues" ? (
         <Leagues onUnauthorized={bad} onSignOut={() => logout()} />
+      ) : route === "#/goals" ? (
+        <Goals onUnauthorized={bad} />
       ) : route === "#/health" ? (
         <Health onUnauthorized={bad} />
       ) : route === "#/games" ? (

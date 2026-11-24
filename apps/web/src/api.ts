@@ -87,6 +87,11 @@ export interface Game {
   pAway: number | null;
   /** model chance of over 2.5 goals, drives the low/high scoring label */
   pOver25: number | null;
+  /** chance both teams score (final number: Pinnacle-led where Pinnacle prices it) */
+  pBtts: number | null;
+  /** our own model's numbers, before following Pinnacle */
+  rawOver25: number | null;
+  rawBtts: number | null;
 }
 
 export interface LeagueRow {
