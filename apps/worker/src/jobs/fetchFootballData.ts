@@ -64,24 +64,31 @@ export async function fetchFootballData(env: Env, now = new Date(), maxLeagues =
             await env.KV.put(`fd:prev:${league.id}`, String(prev.length));
             log[`${league.id}:lastSeason`] = `${prev.length} matches`;
           } catch (e) {
-            // A plan refusal will not change: remember it so it is not retried every hour.
-            if (e instanceof ProviderError && e.kind === "plan") await env.KV.put(`fd:prev:${league.id}`, "refused");
-            throw e;
+            // Last season is optional. Never let it stop the run (that froze fixtures and results on 2026-11-24):
+            // note why, skip it for this league, and carry on with the normal refresh below.
+            const why = e instanceof ProviderError ? `${e.kind}: ${e.message}` : String(e);
+            await env.KV.put(`fd:prev:${league.id}`, `skipped (${why})`);
+            log[`${league.id}:lastSeason`] = `skipped (${why})`;
           }
-          done++;
-          continue;
         }
         const full = league.n === 0 || needCrests;
         if (needCrests) await env.KV.put(`fd:crestfull:${league.id}`, String(now.getTime()));
         const from = full ? "" : day(new Date(now.getTime() - PAST_DAYS * 86400_000));
         const to = full ? "" : day(new Date(now.getTime() + FUTURE_DAYS * 86400_000));
-        const fixtures = await provider.getFixtures(String(ids.footballData), Number(ids.season), from, to);
-        await upsertFixtures(env.DB, league.id, fixtures, now.toISOString(), FOOTBALL_DATA);
-        await env.KV.put(`fd:fetched:${league.id}`, String(now.getTime()));
-        log[league.id] = `${fixtures.length} matches (${full ? "full season" : "window"})`;
         done++;
+        try {
+          const fixtures = await provider.getFixtures(String(ids.footballData), Number(ids.season), from, to);
+          await upsertFixtures(env.DB, league.id, fixtures, now.toISOString(), FOOTBALL_DATA);
+          await env.KV.put(`fd:fetched:${league.id}`, String(now.getTime()));
+          log[league.id] = `${fixtures.length} matches (${full ? "full season" : "window"})`;
+        } catch (e) {
+          // One league failing must not block the others: note it and move on. Rate limits stop the run (next run retries).
+          if (e instanceof ProviderError && e.kind === "quota") throw e;
+          log.error = `${league.id}: ${e instanceof ProviderError ? `${e.kind}: ${e.message}` : String(e)}`;
+        } finally {
+          await env.KV.put("fd:cursor", String(cursor)); // saved each time, so a failing league is never retried first forever
+        }
       }
-      await env.KV.put("fd:cursor", String(cursor));
     }
   } catch (e) {
     // Any provider error stops this run; the next run starts again from the cursor.
