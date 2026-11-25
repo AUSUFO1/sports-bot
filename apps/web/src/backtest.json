@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-11-23",
+  "ranAt": "2026-11-25",
   "leagues": [
     "E0",
     "F1",
@@ -25,5 +25,12 @@
     "roi": null
   },
   "valueRoiModelOnly": -0.0753,
-  "valueBetsModelOnly": 2929
+  "valueBetsModelOnly": 2929,
+  "dailyPicks": {
+    "picks": 472,
+    "days": 234,
+    "won": 0.7097,
+    "avgOdds": 1.45,
+    "roi": 0.0301
+  }
 }

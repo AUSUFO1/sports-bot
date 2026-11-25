@@ -1,3 +1,4 @@
+import { DailyPicks } from "../components/DailyPicks";
 import { usePersisted, useScrollMemory } from "../nav";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type PickRow, type Ticket } from "../api";
@@ -74,14 +75,16 @@ export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
 
   return (
     <main className="page">
-      <h1>Top picks</h1>
-      <p className="lead">Where the model is most confident. These are estimates from past results, not promises.</p>
+      <h1>Picks</h1>
+      <DailyPicks onUnauthorized={onUnauthorized} />
+      <h2>Every game's strongest pick</h2>
+      <p className="muted small">All upcoming games, not only today's chosen ones. Estimates from data, never promises.</p>
       {error && <p className="error" role="alert">{error}</p>}
 
       <section className="ticket">
         <div className="row between">
-          <h2 style={{ margin: 0 }}>Ticket</h2>
-          <div className="chips" role="group" aria-label="Number of legs" style={{ margin: 0, padding: 0 }}>
+          <h2 style={{ margin: 0 }}>Build a ticket · how many games?</h2>
+          <div className="chips" role="group" aria-label="Number of games on the ticket" style={{ margin: 0, padding: 0 }}>
             {[2, 3, 4, 5].map((n) => (
               <button key={n} className="chip" aria-pressed={legs === n} onClick={() => setLegs(n)}>{n}</button>
             ))}

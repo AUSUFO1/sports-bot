@@ -363,3 +363,6 @@ table.compare td:nth-child(n + 2), table.compare th:nth-child(n + 2) { text-alig
 .gpill { display: inline-flex; gap: 6px; align-items: center; padding: 4px 10px; border-radius: 999px; background: var(--soft); font-size: 0.8rem; white-space: nowrap; }
 .gpill b { font-variant-numeric: tabular-nums; }
 .goalpct.low { color: var(--good); }
+.daily { border: 1px solid var(--line); border-radius: 14px; padding: 4px 14px 2px; margin: 12px 0 8px; }
+.daily h2 { margin-top: 14px; }
+.rank { color: var(--accent); margin-right: 4px; }

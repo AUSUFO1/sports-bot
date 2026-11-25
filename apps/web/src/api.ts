@@ -199,3 +199,29 @@ export interface Report {
   confidence: "LOW" | "MEDIUM" | "HIGH";
   warnings: string[];
 }
+
+/** One of Malin's picks of the day (locked when chosen). */
+export interface DailyPick {
+  id: number;
+  day: string;
+  rank: number;
+  matchId: string;
+  market: string;
+  selection: string;
+  prob: number;
+  ourProb: number | null;
+  bestOdds: number;
+  kickoffUtc: string;
+  result: "win" | "loss" | "void" | null;
+  finalScore: string | null;
+  leagueName: string;
+  home: string;
+  away: string;
+  homeCrest: string | null;
+  awayCrest: string | null;
+}
+export interface DailyData {
+  today: string;
+  chosenToday: { day: string; at: string; games: number; picks: number } | null;
+  picks: DailyPick[];
+}

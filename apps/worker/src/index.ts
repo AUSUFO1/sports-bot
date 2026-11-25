@@ -4,6 +4,7 @@ import { buildTicket, type TicketCandidate } from "@sports/stats";
 import { buildReports } from "./jobs/buildReports";
 import { fetchFootballData } from "./jobs/fetchFootballData";
 import { settlePicks } from "./jobs/settlePicks";
+import { localDay, selectDailyPicks } from "./jobs/dailyPicks";
 import { registerOddsRoutes } from "./routes/odds";
 import { analyseMatch, savedAnalysis } from "./ai/analyse";
 import { researchMatch, savedResearch } from "./ai/research";
@@ -204,6 +205,26 @@ app.get("/api/history", async (c) => {
 });
 
 app.post("/api/jobs/settle", async (c) => c.json(await settlePicks(c.env)));
+// Choose today's picks now if they are due (never re-picks a day that is already chosen).
+app.post("/api/jobs/daily", async (c) => c.json(await selectDailyPicks(c.env)));
+
+// Malin's picks of the day: today's locked picks plus the full record (newest day first).
+app.get("/api/daily", async (c) => {
+  const today = localDay(new Date());
+  const rows = await c.env.DB.prepare(
+    `SELECT d.id, d.day, d.rank, d.match_id AS matchId, d.market, d.selection, d.prob, d.our_prob AS ourProb,
+            d.best_odds AS bestOdds, d.kickoff_utc AS kickoffUtc, d.result, d.final_score AS finalScore,
+            l.name AS leagueName, ht.name AS home, at2.name AS away, ht.crest AS homeCrest, at2.crest AS awayCrest
+     FROM daily_picks d
+     JOIN matches m ON m.id = d.match_id
+     JOIN leagues l ON l.id = m.league_id
+     JOIN teams ht ON ht.id = m.home_team_id
+     JOIN teams at2 ON at2.id = m.away_team_id
+     ORDER BY d.day DESC, d.rank LIMIT 600`,
+  ).all();
+  const chosen = await c.env.KV.get(`daily:selected:${today}`);
+  return c.json({ today, chosenToday: chosen ? JSON.parse(chosen) : null, picks: rows.results });
+});
 
 // Manual trigger for the owner (same job as the cron). ?max=1 keeps a test run tiny.
 app.post("/api/jobs/fetch", async (c) => {
@@ -227,7 +248,10 @@ export default {
           .catch(() => undefined)
           .then(() => settlePicks(env))
           .catch(() => undefined)
-          .then(() => buildReports(env, new Date(), 8)),
+          .then(() => buildReports(env, new Date(), 8))
+          .catch(() => undefined)
+          // Picks of the day: chosen once, after the morning odds and report rebuilds (no-op the rest of the day).
+          .then(() => selectDailyPicks(env)),
       );
     } else {
       // At :20 and :40: only build reports. Each trigger is its own run with its own CPU allowance,

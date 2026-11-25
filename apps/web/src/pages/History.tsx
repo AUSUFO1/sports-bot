@@ -1,3 +1,4 @@
+import { TopRecord } from "../components/TopRecord";
 import { usePersisted, useScrollMemory } from "../nav";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type History as H } from "../api";
@@ -22,6 +23,7 @@ export function History({ onUnauthorized }: { onUnauthorized: () => void }) {
   useScrollMemory("history", h !== null);
   const [error, setError] = useState<string | null>(null);
   const [f, setF] = usePersisted<Filters>("history:filters", { range: "all" });
+  const [tab, setTab] = usePersisted<"top" | "all">("history:tab", "top");
 
   useEffect(() => {
     api<H>("/api/history")
@@ -44,11 +46,16 @@ export function History({ onUnauthorized }: { onUnauthorized: () => void }) {
   return (
     <main className="page">
       <h1>History</h1>
-      <p className="lead">Every pick is saved before kickoff and settled after the 90 minutes. Losses stay in.</p>
-      {error && <p className="error" role="alert">{error}</p>}
-      {!h && !error && <p className="muted">Loading history…</p>}
+      <div className="seg" role="group" aria-label="Which record">
+        <button aria-pressed={tab === "top"} onClick={() => setTab("top")}>Top picks of the day</button>
+        <button aria-pressed={tab === "all"} onClick={() => setTab("all")}>All picks</button>
+      </div>
+      {tab === "top" && <TopRecord onUnauthorized={onUnauthorized} />}
+      {tab === "all" && <p className="lead">Every pick is saved before kickoff and settled after the 90 minutes. Losses stay in.</p>}
+      {tab === "all" && error && <p className="error" role="alert">{error}</p>}
+      {tab === "all" && !h && !error && <p className="muted">Loading history…</p>}
 
-      {h && (
+      {tab === "all" && h && (
         <>
           <section className="filters" aria-label="Filters">
             <div className="chips" role="group" aria-label="Day">

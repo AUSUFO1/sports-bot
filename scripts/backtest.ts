@@ -18,6 +18,10 @@ import {
   removeMargin,
   scoreMatrix,
   type PastMatch,
+  selectDaily,
+  DAILY_RULES,
+  type DailyCandidate,
+  type DailyRules,
 } from "../packages/stats/src/index";
 
 const DIR = "data/backtest";
@@ -31,6 +35,8 @@ interface Row extends PastMatch {
   pinOu: [number, number] | null; // over, under 2.5
   odds1x2: [number, number, number] | null;
   oddsOu: [number, number] | null;
+  max1x2: [number, number, number] | null; // best price across books (home, draw, away)
+  maxOu: [number, number] | null; // best over, under 2.5
 }
 
 function parseDate(s: string): string {
@@ -69,6 +75,8 @@ function load(): Row[] {
         date: parseDate(get("Date")!),
         odds1x2: ok1 ? (o1 as [number, number, number]) : null,
         oddsOu: okO ? (oo as [number, number]) : null,
+        max1x2: [num(get("MaxH")), num(get("MaxD")), num(get("MaxA"))].every((x) => x !== null) ? ([num(get("MaxH")), num(get("MaxD")), num(get("MaxA"))] as [number, number, number]) : null,
+        maxOu: num(get("Max>2.5")) && num(get("Max<2.5")) ? [num(get("Max>2.5"))!, num(get("Max<2.5"))!] : null,
         pin1x2: ok1 ? (removeMargin(o1 as number[]).fair as [number, number, number]) : null,
         pinOu: okO ? (removeMargin(oo as number[]).fair as [number, number]) : null,
       });
@@ -170,6 +178,53 @@ function main() {
   const { bets, wins, roi } = valueBets(best.rho, best.w);
   const profit = (roi ?? 0) * bets;
 
+  // ---- Malin's picks of the day: the SAME selectDaily() the live app uses, replayed day by day. ----
+  // Covers home/away and over/under 2.5 (the markets these files price). Played at the best price across books.
+  const byDay = new Map<string, DailyCandidate[]>();
+  const outcome = new Map<string, boolean>();
+  for (const c of scored) {
+    if (!c.r.max1x2 || !c.r.maxOu) continue;
+    const { p1, pOver } = probsFor(c, -0.15); // our model on its own (the "agrees" check)
+    const id = `${c.r.league}|${c.r.date}|${c.r.home}`;
+    const day = c.r.date.slice(0, 10);
+    const total = c.r.homeGoals + c.r.awayGoals;
+    const list = byDay.get(day) ?? [];
+    const add = (market: string, selection: string, prob: number, ourProb: number, odds: number, won: boolean) => {
+      list.push({ matchId: id, kickoffUtc: c.r.date, market, selection, prob, ourProb, bestOdds: odds });
+      outcome.set(`${id}|${market}|${selection}`, won);
+    };
+    add("1x2", "home", c.r.pin1x2![0], p1[0]!, c.r.max1x2[0], c.r.homeGoals > c.r.awayGoals);
+    add("1x2", "away", c.r.pin1x2![2], p1[2]!, c.r.max1x2[2], c.r.homeGoals < c.r.awayGoals);
+    add("ou_2_5", "over", c.r.pinOu![0], pOver, c.r.maxOu[0], total > 2.5);
+    add("ou_2_5", "under", c.r.pinOu![1], 1 - pOver, c.r.maxOu[1], total < 2.5);
+    byDay.set(day, list);
+  }
+  const daily: { minProb: number; minOdds: number; minAgree: number; picks: number; days: number; perDay: number; hit: number; avgOdds: number; roi: number }[] = [];
+  for (const minProb of [0.55, 0.6, 0.65, 0.7, 0.75])
+    for (const minOdds of [1.2, 1.3, 1.4])
+      for (const minAgree of [0, 0.5, 0.55, 0.6]) {
+        const rules: DailyRules = { minProb, minOdds, minAgree, max: 6 };
+        let picks = 0, wins = 0, profit = 0, oddsSum = 0, days = 0;
+        for (const [, cands] of byDay) {
+          const sel = selectDaily(cands, rules);
+          if (sel.length) days++;
+          for (const s of sel) {
+            picks++;
+            oddsSum += s.bestOdds!;
+            if (outcome.get(`${s.matchId}|${s.market}|${s.selection}`)) { wins++; profit += s.bestOdds! - 1; } else profit -= 1;
+          }
+        }
+        if (picks >= 100) daily.push({ minProb, minOdds, minAgree, picks, days, perDay: picks / Math.max(1, days), hit: wins / picks, avgOdds: oddsSum / picks, roi: profit / picks });
+      }
+  daily.sort((a, b) => b.roi - a.roi);
+  console.log("Picks of the day, best rules by return per pick (best price across books):");
+  for (const d of daily.slice(0, 10)) {
+    console.log(`  prob>=${d.minProb} odds>=${d.minOdds} agree>=${d.minAgree}: ${d.picks} picks on ${d.days} days (${d.perDay.toFixed(1)}/day), won ${(d.hit * 100).toFixed(1)}%, avg odds ${d.avgOdds.toFixed(2)}, return ${(d.roi * 100).toFixed(1)}%`);
+  }
+  const byHit = [...daily].sort((a, b) => b.hit - a.hit).slice(0, 5);
+  console.log("Highest win rate:");
+  for (const d of byHit) console.log(`  prob>=${d.minProb} odds>=${d.minOdds} agree>=${d.minAgree}: won ${(d.hit * 100).toFixed(1)}% of ${d.picks}, avg odds ${d.avgOdds.toFixed(2)}, return ${(d.roi * 100).toFixed(1)}%`);
+
   const seasons = [...new Set(all.map((r) => r.date.slice(0, 4)))];
   const summary = {
     ranAt: new Date().toISOString().slice(0, 10),
@@ -186,6 +241,11 @@ function main() {
     picks: { bets, wins, roi: bets ? +(profit / bets).toFixed(4) : null },
     valueRoiModelOnly: (() => { const v = valueBets(modelOnly.rho, 1); return v.roi === null ? null : +v.roi.toFixed(4); })(),
     valueBetsModelOnly: valueBets(modelOnly.rho, 1).bets,
+    // the live rule (DAILY_RULES) as it scored here
+    dailyPicks: (() => {
+      const d = daily.find((x) => x.minProb === DAILY_RULES.minProb && x.minOdds === DAILY_RULES.minOdds && x.minAgree === DAILY_RULES.minAgree);
+      return d ? { picks: d.picks, days: d.days, won: +d.hit.toFixed(4), avgOdds: +d.avgOdds.toFixed(2), roi: +d.roi.toFixed(4) } : null;
+    })(),
   };
   writeFileSync("apps/web/src/backtest.json", JSON.stringify(summary, null, 2) + "\n");
 
