@@ -3,7 +3,8 @@ import type { Env } from "../types";
 
 const WINDOW_DAYS = 7; // "next several days"
 const STALE_HOURS = 12; // regenerate a report after this long
-const DEFAULT_CAP = 12; // statistics are CPU work; Free Workers allow 10 ms per run, so keep batches small
+const DEFAULT_CAP = 12;
+const HISTORY_DAYS = 450; // results older than this weigh almost nothing in the model // statistics are CPU work; Free Workers allow 10 ms per run, so keep batches small
 
 interface Upcoming {
   id: string;
@@ -42,9 +43,11 @@ export async function buildReports(env: Env, now = new Date(), cap = DEFAULT_CAP
         const rows = await env.DB.prepare(
           `SELECT ht.name AS home, at2.name AS away, m.home_goals, m.away_goals, m.kickoff_utc
            FROM matches m JOIN teams ht ON ht.id = m.home_team_id JOIN teams at2 ON at2.id = m.away_team_id
-           WHERE m.league_id = ?1 AND m.status = 'finished' AND m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL`,
+           WHERE m.league_id = ?1 AND m.status = 'finished' AND m.kickoff_utc >= ?2
+             AND m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL`,
         )
-          .bind(m.league_id)
+          // Older than ~15 months weighs almost nothing (weight halves every 60 days), so it is not read at all.
+          .bind(m.league_id, new Date(now.getTime() - HISTORY_DAYS * 86400_000).toISOString())
           .all<{ home: string; away: string; home_goals: number; away_goals: number; kickoff_utc: string }>();
         history = rows.results.map((r) => ({
           home: r.home,
@@ -56,15 +59,21 @@ export async function buildReports(env: Env, now = new Date(), cap = DEFAULT_CAP
         histories.set(m.league_id, history);
       }
 
-      const odds = await env.DB.prepare(
+      // All prices for this one match (index on match_id), newest first; keep the latest per bookmaker, market and
+      // selection here in code. The old correlated subquery re-scanned the table for every row.
+      const allOdds = await env.DB.prepare(
         `SELECT bookmaker, market, selection, decimal_odds AS decimalOdds, captured_at AS capturedAt
-         FROM odds_snapshots o
-         WHERE match_id = ?1 AND captured_at = (
-           SELECT MAX(captured_at) FROM odds_snapshots
-           WHERE match_id = o.match_id AND bookmaker = o.bookmaker AND market = o.market AND selection = o.selection)`,
+         FROM odds_snapshots WHERE match_id = ?1 ORDER BY captured_at DESC`,
       )
         .bind(m.id)
         .all<OddsInput>();
+      const seen = new Set<string>();
+      const odds = {
+        results: allOdds.results.filter((o) => {
+          const k = `${o.bookmaker}|${o.market}|${o.selection}`;
+          return seen.has(k) ? false : (seen.add(k), true);
+        }),
+      };
 
       const report = buildReport({
         matchId: m.id,

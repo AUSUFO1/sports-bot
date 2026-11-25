@@ -36,8 +36,9 @@ export async function fetchFootballData(env: Env, now = new Date(), maxLeagues =
     }
 
     const rows = await env.DB.prepare(
-      `SELECT l.id, l.provider_ids, (SELECT COUNT(*) FROM matches m WHERE m.league_id = l.id) AS n,
-              (SELECT COUNT(*) FROM teams t WHERE t.league_id = l.id AND t.crest IS NULL) AS no_crest
+      // EXISTS stops at the first row (with the league indexes), instead of counting every match of every league.
+      `SELECT l.id, l.provider_ids, EXISTS (SELECT 1 FROM matches m WHERE m.league_id = l.id) AS n,
+              EXISTS (SELECT 1 FROM teams t WHERE t.league_id = l.id AND t.crest IS NULL) AS no_crest
        FROM leagues l WHERE l.active = 1 AND l.id LIKE 'fd-%' ORDER BY l.id`,
     ).all<{ id: string; provider_ids: string; n: number; no_crest: number }>();
     const todo = rows.results.filter((r) => JSON.parse(r.provider_ids).season != null);
