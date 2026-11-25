@@ -1,3 +1,4 @@
+import { usePersisted, useScrollMemory } from "../nav";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type Game } from "../api";
 import { dayKey, dayLabel, freshness, ageText, modelLean, pct, SCORING_NAMES, scoringOf, time, VALUE_NAMES, valueStateOf } from "../format";
@@ -7,7 +8,8 @@ import { Crest } from "../components/Crest";
 export function Games({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [games, setGames] = useState<Game[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [league, setLeague] = useState("");
+  const [league, setLeague] = usePersisted("games:league", "");
+  useScrollMemory("games", games !== null);
 
   const load = () => {
     setError(null);

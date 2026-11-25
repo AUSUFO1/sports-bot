@@ -1,3 +1,4 @@
+import { usePersisted, useScrollMemory } from "../nav";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type History as H } from "../api";
 import { dayLabel, GROUP_NAMES, pct, pickGroup, pickLabel } from "../format";
@@ -18,8 +19,9 @@ const hh = (h: number) => `${String(h).padStart(2, "0")}:00`;
 
 export function History({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [h, setH] = useState<H | null>(null);
+  useScrollMemory("history", h !== null);
   const [error, setError] = useState<string | null>(null);
-  const [f, setF] = useState<Filters>({ range: "all" });
+  const [f, setF] = usePersisted<Filters>("history:filters", { range: "all" });
 
   useEffect(() => {
     api<H>("/api/history")

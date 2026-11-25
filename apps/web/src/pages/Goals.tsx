@@ -1,3 +1,4 @@
+import { useScrollMemory } from "../nav";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type Game } from "../api";
 import { dayKey, dayLabel, pct, time } from "../format";
@@ -53,6 +54,7 @@ export function Goals({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [games, setGames] = useState<Game[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mode, setModeState] = useState<Mode>(readMode);
+  useScrollMemory(`goals:${mode}`, games !== null);
   const setMode = (m: Mode) => {
     setModeState(m);
     try {

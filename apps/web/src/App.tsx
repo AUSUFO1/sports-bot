@@ -1,3 +1,4 @@
+import { setLastListRoute } from "./nav";
 import { useEffect, useState } from "react";
 import { getToken, setToken } from "./api";
 import { Games } from "./pages/Games";
@@ -14,7 +15,14 @@ import { BRAND_MARK, BRAND_NAME } from "./brand";
 function useRoute(): string {
   const [route, setRoute] = useState(window.location.hash || "#/");
   useEffect(() => {
-    const on = () => setRoute(window.location.hash || "#/");
+    const on = () => {
+      const r = window.location.hash || "#/";
+      setRoute(r);
+      // A game opens at the top; list pages put their own scroll back once their data loads (see nav.ts).
+      if (r.startsWith("#/game/")) window.scrollTo(0, 0);
+      else setLastListRoute(r);
+    };
+    if (!(window.location.hash || "#/").startsWith("#/game/")) setLastListRoute(window.location.hash || "#/");
     window.addEventListener("hashchange", on);
     return () => window.removeEventListener("hashchange", on);
   }, []);

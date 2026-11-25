@@ -4,7 +4,9 @@ import type { Env } from "../types";
 const WINDOW_DAYS = 7; // "next several days"
 const STALE_HOURS = 12; // regenerate a report after this long
 const DEFAULT_CAP = 12;
-const HISTORY_DAYS = 450; // results older than this weigh almost nothing in the model // statistics are CPU work; Free Workers allow 10 ms per run, so keep batches small
+const HISTORY_DAYS = 450; // results older than this weigh almost nothing in the model
+const LOG_WITHIN_H = 36; // picks are logged only for games kicking off within this many hours
+const LOG_MAX_ODDS_AGE_H = 14; // ...and only when the odds are this fresh (the odds job runs twice a day) // statistics are CPU work; Free Workers allow 10 ms per run, so keep batches small
 
 interface Upcoming {
   id: string;
@@ -96,23 +98,33 @@ export async function buildReports(env: Env, now = new Date(), cap = DEFAULT_CAP
         .bind(m.id, JSON.stringify(report), MODEL_VERSION, JSON.stringify(report.dataFreshness), now.toISOString())
         .run();
 
-      // Log each top pick once, before kickoff. INSERT OR IGNORE keeps the first pick forever (no hindsight edits).
-      if (report.picks.length > 0) {
-        const ins = env.DB.prepare(
-          `INSERT OR IGNORE INTO picks_log
-             (match_id, market, selection, model_prob, odds_taken, result, created_at,
-              league_id, kickoff_utc, kind, confidence, ev, pred_score)
-           VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
-        );
-        await env.DB.batch(
-          report.picks.map((p) =>
-            ins.bind(
-              m.id, p.market, p.selection, p.modelProb, p.odds ?? 0, now.toISOString(),
-              m.league_id, m.kickoff_utc, p.kind, report.confidence, p.ev, report.predictedScore,
+      // Log picks ONCE per match, and only when they rest on fresh Pinnacle prices close to kickoff, so every row in
+      // History is the same kind of pick. Earlier builds (no odds yet, days ahead) are not logged; the first
+      // qualifying build is kept forever (no hindsight edits) and later builds never add a second, different set.
+      const blended = new Set(report.model?.tuning?.blendedMarkets ?? []);
+      const oddsAt = report.dataFreshness.odds ? Date.parse(report.dataFreshness.odds) : NaN;
+      const toKickoffH = (Date.parse(m.kickoff_utc) - now.getTime()) / 3600_000;
+      const fresh = Number.isFinite(oddsAt) && (now.getTime() - oddsAt) / 3600_000 <= LOG_MAX_ODDS_AGE_H;
+      const loggable = report.picks.filter((p) => blended.has(p.market));
+      if (fresh && toKickoffH <= LOG_WITHIN_H && loggable.length > 0) {
+        const already = await env.DB.prepare(`SELECT 1 FROM picks_log WHERE match_id = ?1 LIMIT 1`).bind(m.id).first();
+        if (!already) {
+          const ins = env.DB.prepare(
+            `INSERT OR IGNORE INTO picks_log
+               (match_id, market, selection, model_prob, odds_taken, result, created_at,
+                league_id, kickoff_utc, kind, confidence, ev, pred_score, model_version)
+             VALUES (?1, ?2, ?3, ?4, ?5, NULL, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
+          );
+          await env.DB.batch(
+            loggable.map((p) =>
+              ins.bind(
+                m.id, p.market, p.selection, p.modelProb, p.odds ?? 0, now.toISOString(),
+                m.league_id, m.kickoff_utc, p.kind, report.confidence, p.ev, report.predictedScore, MODEL_VERSION,
+              ),
             ),
-          ),
-        );
-        results.picks_logged += report.picks.length;
+          );
+          results.picks_logged += loggable.length;
+        }
       }
 
       results.built++;

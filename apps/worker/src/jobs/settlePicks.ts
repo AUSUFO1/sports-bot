@@ -6,9 +6,15 @@ export async function settlePicks(env: Env, now = new Date()) {
   const rows = await env.DB.prepare(
     `SELECT p.id, p.market, p.selection, m.status, m.home_goals, m.away_goals
      FROM picks_log p JOIN matches m ON m.id = p.match_id
-     WHERE p.result IS NULL AND m.status IN ('finished', 'postponed')
+     WHERE p.result IS NULL AND (
+       (m.status = 'finished' AND m.home_goals IS NOT NULL AND m.away_goals IS NOT NULL)
+       -- a postponed game is often rescheduled: void only once it is 48 hours past its kickoff and still not played
+       OR (m.status = 'postponed' AND m.kickoff_utc < ?1))
+     ORDER BY p.id
      LIMIT 100`,
-  ).all<{ id: number; market: string; selection: string; status: string; home_goals: number | null; away_goals: number | null }>();
+  )
+    .bind(new Date(now.getTime() - 48 * 3600_000).toISOString())
+    .all<{ id: number; market: string; selection: string; status: string; home_goals: number | null; away_goals: number | null }>();
 
   const upd = env.DB.prepare(`UPDATE picks_log SET result = ?1, final_score = ?2, settled_at = ?3 WHERE id = ?4 AND result IS NULL`);
   const stmts: D1PreparedStatement[] = [];

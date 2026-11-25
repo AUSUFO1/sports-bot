@@ -216,3 +216,32 @@ describe("Dixon-Coles and market blend", () => {
     expect(r.model!.probabilities["1x2"]).toEqual(r.model!.rawProbabilities!["1x2"]);
   });
 });
+
+describe("Pinnacle-led value (modelWeight < 1)", () => {
+  const led = { rho: 0, modelWeight: 0 };
+  const pin = (sel: string, o: number, market = "1x2") => odd(sel, o, undefined, market, "pinnacle");
+
+  it("prices value at the best odds on offer, against Pinnacle's fair price", () => {
+    // Pinnacle: no margin, 1/3 each. Another book pays 3.6 on home: EV = 3.6/3 - 1 = +20%.
+    const r = buildReport(input({ odds: [pin("home", 3), pin("draw", 3), pin("away", 3), odd("home", 3.6)], tuning: led }));
+    const home = r.value.find((v) => v.selection === "home")!;
+    expect(home.odds).toBe(3.6);
+    expect(home.edge).toBeCloseTo(0, 12);
+    expect(home.ev).toBeCloseTo(0.2, 9);
+    expect(r.shortlist.map((s) => s.selection)).toContain("home");
+  });
+
+  it("does not call anything value when no book beats Pinnacle's fair price", () => {
+    const r = buildReport(input({ odds: [pin("home", 2.9), pin("draw", 2.9), pin("away", 2.9)], tuning: led }));
+    expect(r.value.every((v) => v.ev < 0)).toBe(true);
+    expect(r.shortlist).toEqual([]);
+    expect(r.verdict).toBe("NO_BET");
+  });
+
+  it("makes no value claim on a market only a soft book priced", () => {
+    const r = buildReport(input({ odds: [odd("home", 5), odd("draw", 5), odd("away", 5)], tuning: led }));
+    expect(r.value).toEqual([]);
+    expect(r.warnings.some((w) => w.includes("No Pinnacle price for 1x2"))).toBe(true);
+    expect(r.warnings.some((w) => w.includes("No bookmaker odds"))).toBe(false);
+  });
+});

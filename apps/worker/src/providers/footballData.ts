@@ -5,9 +5,11 @@ const BASE = "https://api.football-data.org/v4";
 type Json = Record<string, any>; // provider JSON is untyped; every field is read defensively below
 
 function mapStatus(s: string): Fixture["status"] {
-  if (["FINISHED", "AWARDED"].includes(s)) return "finished";
-  if (["IN_PLAY", "PAUSED", "LIVE"].includes(s)) return "live";
-  if (["POSTPONED", "SUSPENDED", "CANCELLED"].includes(s)) return "postponed";
+  if (s === "FINISHED") return "finished";
+  // A suspended game can resume or be replayed: treat it as still live, never settle or void it yet.
+  if (["IN_PLAY", "PAUSED", "LIVE", "SUSPENDED"].includes(s)) return "live";
+  // AWARDED is a walkover (e.g. 3-0 by decision), not football: void picks and keep it out of the model's history.
+  if (["POSTPONED", "CANCELLED", "AWARDED"].includes(s)) return "postponed";
   return "scheduled";
 }
 

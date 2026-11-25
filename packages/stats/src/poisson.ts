@@ -78,12 +78,14 @@ export function computeLambdas(
   opts: ModelOptions = DEFAULT_OPTIONS,
 ): Lambdas | null {
   const t0 = Date.parse(asOf);
-  const past = matches
-    .filter((m) => Date.parse(m.date) < t0)
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date)); // newest first
+  // Parse each date once (the free plan allows only 10 ms of CPU per run), then sort newest first.
+  const timed = matches.map((m) => ({ m, t: Date.parse(m.date) })).filter((x) => x.t < t0);
+  timed.sort((a, b) => b.t - a.t);
+  const past = timed.map((x) => x.m);
   if (past.length === 0) return null;
+  const weightOf = new Map<PastMatch, number>(timed.map((x) => [x.m, decayWeight((t0 - x.t) / DAY, opts.halfLifeDays)]));
 
-  const w = (m: PastMatch) => decayWeight((t0 - Date.parse(m.date)) / DAY, opts.halfLifeDays);
+  const w = (m: PastMatch) => weightOf.get(m)!;
   let sw = 0;
   let sh = 0;
   let sa = 0;

@@ -1,3 +1,4 @@
+import { lastListRoute } from "../nav";
 import { useEffect, useState } from "react";
 import { api, ApiError, type Report } from "../api";
 import { ageText, dayLabel, freshness, LABELS, MARKET_NAMES, modelLean, pct, pickLabel, SCORING_NAMES, scoringOf, signedPct, time } from "../format";
@@ -24,7 +25,19 @@ export function Game({ id, onUnauthorized }: { id: string; onUnauthorized: () =>
 
   return (
     <main className="page">
-      <a href="#/" className="back">← All games</a>
+      <a
+        href={lastListRoute()}
+        className="back"
+        onClick={(e) => {
+          // Came here from a page in this app: step back so that page returns as you left it.
+          if (window.history.length > 1 && sessionStorage.getItem("nav:last")) {
+            e.preventDefault();
+            window.history.back();
+          }
+        }}
+      >
+        ← Back
+      </a>
       {error && <p className="error" role="alert">{error}</p>}
       {!r && !error && <p className="muted">Loading report…</p>}
       {r && <Detail r={r} onUnauthorized={onUnauthorized} />}

@@ -220,11 +220,14 @@ export default {
   fetch: app.fetch,
   async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
     if (event.cron === "0 * * * *") {
-      // On the hour: fetch data, then build reports and log picks, then settle finished games.
+      // On the hour: fetch data (new scores), settle finished picks straight after (cheap, must never be starved by
+      // the free plan's per-run limits), then build reports. Each step runs even if the one before it failed.
       ctx.waitUntil(
         fetchFootballData(env)
-          .then(() => buildReports(env))
-          .then(() => settlePicks(env)),
+          .catch(() => undefined)
+          .then(() => settlePicks(env))
+          .catch(() => undefined)
+          .then(() => buildReports(env, new Date(), 8)),
       );
     } else {
       // At :20 and :40: only build reports. Each trigger is its own run with its own CPU allowance,

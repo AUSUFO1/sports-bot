@@ -1,3 +1,4 @@
+import { usePersisted, useScrollMemory } from "../nav";
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, type PickRow, type Ticket } from "../api";
 import { CATEGORY_NAMES, categoryOf, dayKey, dayLabel, GROUP_NAMES, pct, pickGroup, pickLabel, SCORING_NAMES, scoringOf, time, type Category } from "../format";
@@ -6,11 +7,12 @@ import { Crest } from "../components/Crest";
 
 export function Picks({ onUnauthorized }: { onUnauthorized: () => void }) {
   const [picks, setPicks] = useState<PickRow[] | null>(null);
+  useScrollMemory("picks", picks !== null);
   const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [legs, setLegs] = useState(4);
+  const [legs, setLegs] = usePersisted("picks:legs", 4);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [cat, setCat] = useState<Category | "all">("all");
+  const [cat, setCat] = usePersisted<Category | "all">("picks:cat", "all");
 
   const fail = (e: unknown) => {
     if (e instanceof ApiError && e.status === 401) return onUnauthorized();

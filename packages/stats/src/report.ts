@@ -158,14 +158,10 @@ export function buildReport(input: ReportInput): Report {
     btts: { ...btts(matrix) },
   };
 
-  // Elo sanity check on 1X2.
-  const ratings = buildEloRatings(input.history, input.kickoffUtc);
-  const e = eloExpected(ratings[input.home] ?? ELO_START, ratings[input.away] ?? ELO_START);
-  const elo = eloOneXTwo(e);
-  const p1 = probabilities["1x2"]!;
-  const modelGap = Math.max(Math.abs(elo.home - p1.home!), Math.abs(elo.draw - p1.draw!), Math.abs(elo.away - p1.away!));
-  const agrees = modelsAgree(modelGap, cfg);
-  if (!agrees) warnings.push(`Poisson and Elo disagree strongly (largest gap ${(modelGap * 100).toFixed(0)} points)`);
+  // Pinnacle-led mode (backtest): value = a bookmaker pays more than Pinnacle's fair price, so the edge-over-fair rule
+  // does not apply (the final probability IS the fair price), and our model alone is never trusted for value.
+  const marketLed = tuning.modelWeight < 1;
+  const pickCfg: PickConfig = marketLed ? { ...cfg, minEdge: 0 } : cfg;
 
   if (Math.min(lam.homeMatches, lam.awayMatches) < cfg.minMatches) {
     warnings.push(`Low sample: ${lam.homeMatches} home-side and ${lam.awayMatches} away-side matches (need ${cfg.minMatches})`);
@@ -213,17 +209,33 @@ export function buildReport(input: ReportInput): Report {
     margins[market] = margin;
     if (!useRef && books[market]!.size === 1) warnings.push(`Only 1 bookmaker priced ${market}`);
     // Blend with the sharp price. Only Pinnacle is trusted for this; a soft book's price is not a good anchor.
-    if (useRef && tuning.modelWeight < 1) {
+    if (useRef && marketLed) {
       const w = Math.max(0, Math.min(1, tuning.modelWeight));
       for (const s of selections) probabilities[market]![s] = w * raw[market]![s]! + (1 - w) * fair[market]![s]!;
       blendedMarkets.push(market);
     }
+    if (marketLed && !useRef) {
+      // No Pinnacle price: the only probability is our model's, which the backtest showed loses as "value".
+      warnings.push(`No Pinnacle price for ${market}, so no value check there`);
+      continue;
+    }
     for (const s of selections) {
-      candidates.push({ market, selection: s, modelProb: probabilities[market]![s]!, fairProb: fair[market]![s]!, odds: priced[s]! });
+      // Pinnacle-led: price the pick at the BEST odds on offer (you can take any book), fair from Pinnacle.
+      const odds = marketLed ? best[s]! : priced[s]!;
+      candidates.push({ market, selection: s, modelProb: probabilities[market]![s]!, fairProb: fair[market]![s]!, odds });
     }
   }
 
-  const hasOdds = candidates.length > 0;
+  // Elo sanity check on 1X2, against the FINAL numbers (what the picks actually use).
+  const ratings = buildEloRatings(input.history, input.kickoffUtc);
+  const e = eloExpected(ratings[input.home] ?? ELO_START, ratings[input.away] ?? ELO_START);
+  const elo = eloOneXTwo(e);
+  const p1 = probabilities["1x2"]!;
+  const modelGap = Math.max(Math.abs(elo.home - p1.home!), Math.abs(elo.draw - p1.draw!), Math.abs(elo.away - p1.away!));
+  const agrees = modelsAgree(modelGap, cfg);
+  if (!agrees) warnings.push(`Final numbers and Elo disagree strongly (largest gap ${(modelGap * 100).toFixed(0)} points)`);
+
+  const hasOdds = Object.keys(fair).length > 0;
   if (!hasOdds) warnings.push("No bookmaker odds available, so no value check was possible");
   const oddsAgeHours = hasOdds ? (now - oldest) / HOUR : Infinity;
   if (hasOdds && oddsAgeHours > cfg.maxOddsAgeHours) warnings.push(`Odds are ${Math.round(oddsAgeHours)} hours old`);
@@ -236,7 +248,7 @@ export function buildReport(input: ReportInput): Report {
     );
   }
   const ctx = { homeMatches: lam.homeMatches, awayMatches: lam.awayMatches, oddsAgeHours, modelGap };
-  const list = hasOdds ? shortlist(value, ctx, cfg) : [];
+  const list = hasOdds ? shortlist(value, ctx, pickCfg) : [];
   const picks = topPicks(
     {
       probabilities,
@@ -248,7 +260,7 @@ export function buildReport(input: ReportInput): Report {
       shortlisted: list,
     },
     undefined,
-    cfg,
+    pickCfg,
   );
 
   return {
