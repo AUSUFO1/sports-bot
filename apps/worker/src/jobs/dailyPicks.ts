@@ -67,8 +67,9 @@ export async function selectDailyPicks(env: Env, now = new Date(), force = false
     }
   }
 
-  // Not enough fresh reports yet (the morning odds have not been processed): try again next hour, choose nothing.
-  if (!force && rows.results.length > 0 && stale > rows.results.length / 2 && localHour(now) < 14) {
+  // Not enough fresh reports yet (the odds have not been processed): try again next hour, choose and lock NOTHING.
+  // Never lock a day on stale prices; the afternoon odds update (15:00 UTC) also counts.
+  if (!force && rows.results.length > 0 && stale > rows.results.length / 2) {
     return { day, skipped: `waiting for fresh odds (${stale} of ${rows.results.length} reports not updated yet)` };
   }
 
